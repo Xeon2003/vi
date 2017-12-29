@@ -398,3 +398,65 @@ var DividerBlot = function (_Quill$import11) {
 DividerBlot.blotName = 'divider';
 DividerBlot.tagName = 'hr';
 Quill.register(DividerBlot, true);
+
+// Improved line breaking (from https://codepen.io/mackermedia/pen/gmNwZP)
+
+var Delta = Quill.import('delta');
+var Break = Quill.import('blots/break');
+var Embed = Quill.import('blots/embed');
+
+function lineBreakMatcher() {
+	var newDelta = new Delta();
+	newDelta.insert({ 'break': '' });
+	return newDelta;
+}
+
+function lineBreakHandler(range) {
+	var currentLeaf = this.quill.getLeaf(range.index)[0];
+	var nextLeaf = this.quill.getLeaf(range.index + 1)[0];
+
+	this.quill.insertEmbed(range.index, 'break', true, 'user');
+
+	// Insert a second break if:
+	// At the end of the editor, OR next leaf has a different parent (<p>)
+	if (nextLeaf === null || currentLeaf.parent !== nextLeaf.parent) {
+		this.quill.insertEmbed(range.index, 'break', true, 'user');
+	}
+
+	// Now that we've inserted a line break, move the cursor forward
+	this.quill.setSelection(range.index + 1, Quill.sources.SILENT);
+}
+
+var SmartBreak = function (_Break) {
+	_inherits(SmartBreak, _Break);
+
+	function SmartBreak() {
+		_classCallCheck(this, SmartBreak);
+
+		return _possibleConstructorReturn(this, (SmartBreak.__proto__ || Object.getPrototypeOf(SmartBreak)).apply(this, arguments));
+	}
+
+	_createClass(SmartBreak, [{
+		key: "length",
+		value: function length() {
+			return 1;
+		}
+	}, {
+		key: "value",
+		value: function value() {
+			return '\n';
+		}
+	}, {
+		key: "insertInto",
+		value: function insertInto(parent, ref) {
+			Embed.prototype.insertInto.call(this, parent, ref);
+		}
+	}]);
+
+	return SmartBreak;
+}(Break);
+
+SmartBreak.blotName = 'break';
+SmartBreak.tagName = 'BR';
+
+Quill.register(SmartBreak);

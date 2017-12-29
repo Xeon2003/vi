@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xml:lang="en" lang="en" ng-app="ViApp" xmlns="http://www.w3.org/1999/html">
+<html xml:lang="en" lang="en" xmlns="http://www.w3.org/1999/html">
 <head>
     <meta charset="utf-8">
 
@@ -52,15 +52,8 @@
 
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 
-    <script type="text/javascript" src="quill.min.js"></script>
+    <script type="text/javascript" src="quill/quill.min.js"></script>
     <script type="text/javascript" src="textedit.js"></script>
-    <script type="text/javascript">
-        var quill = Quill;
-    </script>
-
-    <script type="text/javascript" src="quill.js"></script>
-
-    <meta name="pygwt:module" content="main">
 </head>
 <body>
     <div class="vi-application">
@@ -109,9 +102,32 @@
                 <input type="text" id="label-autoid-for-5">
                 <label for="label-autoid-for-5" class="titlelbl">Title</label>
             </div>
-            <div class="contentdiv" id="wysiwyg0"></div>
+            <div class="contentdiv" id="wysiwyg0">test</div>
         </div>
     </div>
+    <script>
+        var options = {
+          theme: 'snow',
+          modules: {
+            clipboard: {
+              matchers: [
+                ['BR', lineBreakMatcher]
+              ]
+            },
+            keyboard: {
+              bindings: {
+                linebreak: {
+                  key: 13,
+                  shiftKey: true,
+                  handler: lineBreakHandler
+                }
+              }
+            }
+          }
+        };
+
+        var quill = new Quill("#wysiwyg0", options);
+    </script>
 
 </body>
 </html>
