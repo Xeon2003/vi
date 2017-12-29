@@ -30,41 +30,49 @@ class HtmlEditor(html5.Div):
 
 		elem = self.richView.element
 		self.quill = JS("""
-
 			new window.top.quill(
-				@{{elem}},  // The element
+				// The element  
+				@{{elem}},
 				
+				// Options
 				{
-				  // Theme
-		          theme: 'snow',    
-		          
-		          // Toolbar
-				  toolbar: [
-		               [{ header: [false] }],
-		               ["bold", "italic", "underline"], //, "image"
-		               [{ 'list': 'bullet' }],
-		               [{ "align": [] }],
-		               ["clean"]
-		          ],
-		          
-		          // Improved Line Break
-		          modules: {        
-		            clipboard: {
-		              matchers: [
-		                ['BR', window.top.lineBreakMatcher]
-		              ]
-		            },
-		            keyboard: {
-		              bindings: {
-		                linebreak: {
-		                  key: 13,
-		                  shiftKey: true,
-		                  handler: window.top.lineBreakHandler
-		                }
-		              }
-		            }
-		          }
-		        })
+				        // Theme
+				        theme: 'snow',
+				
+				        // Modules
+				        modules:
+				            {
+				                // Toolbar
+				                toolbar: [
+				                    [{header: [false]}],
+				                    ["bold", "italic", "underline"], //, "image"
+				                    [{'list': 'bullet'}],
+				                    [{"align": []}],
+				                    ["clean"]
+				                ],
+				
+				                // Improved Line Break
+				                clipboard:
+				                    {
+				                        matchers: [
+				                            ['BR', window.top.lineBreakMatcher]
+				                        ]
+				                    }
+				                ,
+				                keyboard: {
+				                    bindings: {
+				                        linebreak: {
+				                            key: 13,
+				                            shiftKey:
+				                                true,
+				                            handler:
+				                            window.top.lineBreakHandler
+				                        }
+				                    }
+				                }
+				            }
+				    }		
+		)
         """)
 
 		self.quill.on("editor-change", self.onEditorChange)
@@ -93,14 +101,17 @@ class HtmlEditor(html5.Div):
 		if not self.quill:
 			return self.value
 
-		return self.quill.root.innerHTML
+		txt = self.quill.root.innerHTML
+		txt = txt.replace('<p class="ql-align-justify"><br></p>', "") #https://github.com/quilljs/quill/issues/1328#issuecomment-310781582
+		return txt
 
 	def _setValue(self, val):
 		if not self.quill:
 			self.value = val
 			return
 
-		self.quill.root.innerHTML = val
+		#self.quill.root.innerHTML = val
+		self.quill.clipboard.dangerouslyPasteHTML(val) #https://github.com/quilljs/quill/issues/252#issuecomment-314059954
 
 	@classmethod
 	def fromSkelStructure(cls, moduleName, boneName, skelStructure, *args, **kwargs):
