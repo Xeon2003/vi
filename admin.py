@@ -17,6 +17,9 @@ import bones
 import actions
 import i18n
 
+# test test test
+#from widgets.wysiwyg import Wysiwyg
+
 class AdminScreen(Screen):
 
 	def __init__(self, *args, **kwargs ):
@@ -190,6 +193,11 @@ class AdminScreen(Screen):
 		viInitializedEvent.fire()
 		DeferredCall(self.checkInitialHash)
 		self.unlock()
+
+		#test test test
+		#pane = Pane("Texteditor")
+		#pane.addWidget(Wysiwyg("Hello World"))
+		#conf["mainWindow"].addPane(pane)
 
 	def remove(self):
 		self.userLoggedOutMsg.stopInterval()

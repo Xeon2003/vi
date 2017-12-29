@@ -5,6 +5,7 @@
 # Programs
 PYJSBUILD	=	pyjsbuild
 LESSC		=	lessc
+NPM         =   npm
 
 # Variables
 VI_CUSTOM	= 	../vi_customizing
@@ -25,6 +26,9 @@ MORE_LESS	=	public/login.less
 CUSTOM_LESS	=	public/default/vi_custom.less \
 				$(wildcard $(VI_CUSTOM)/static/vi_custom.less)
 
+TEXTEDIT_JS =   public/textedit.js
+TEXTEDIT_ES =   textedit/textedit.es6
+
 # Rules
 
 all: debug
@@ -38,6 +42,9 @@ defaultcss: $(MAIN_CSS)
 $(MAIN_CSS): $(MAIN_LESS) $(MORE_LESS) $(CUSTOM_LESS)
 	$(LESSC) $(LESSCOPTS) $(MAIN_LESS) >$@
 
+$(TEXTEDIT_JS): $(TEXTEDIT_ES)
+	cd textedit; $(NPM) run build
+
 copyfiles:
 	if [ -x $(VI_CUSTOM)/static ]; then \
 		cp -rv $(VI_CUSTOM)/static/* $(OUTPUT); \
@@ -49,15 +56,7 @@ version:
 $(OUTPUT): 
 	mkdir -p $@
 
-watch: $(OUTPUT) $(MAIN_CSS) version copyfiles
-	$(PYJSBUILD) -o $(OUTPUT) \
-        $(DEBUGOPTS) \
-        --bootloader=bootstrap_progress.js \
-        -I ./$(VI_CUSTOM) \
-		--enable-rebuilds \
-	        main.py
-
-debug: $(OUTPUT) $(MAIN_CSS) version copyfiles
+debug: $(OUTPUT) $(MAIN_CSS) $(TEXTEDIT_JS) version copyfiles
 	@echo "--- STARTING DEBUG BUILD ---"
 	$(PYJSBUILD) -o $(OUTPUT) \
 		$(DEBUGOPTS) \
@@ -66,7 +65,7 @@ debug: $(OUTPUT) $(MAIN_CSS) version copyfiles
 				main.py
 	@echo "--- FINISHED DEBUG BUILD ---"
 
-deploy: $(MAIN_CSS) version copyfiles
+deploy: $(MAIN_CSS) $(TEXTEDIT_JS) version copyfiles
 	@echo "--- STARTING DEPLOY BUILD ---"
 	$(PYJSBUILD) -o $(OUTPUT) \
 		$(DEPLOYOPTS) \
@@ -79,4 +78,4 @@ tarfile: deploy
 	tar cvf "vi_`date +'%Y-%m-%d'`.tar" vi
 	
 clean: $(OUTPUT)
-	rm -rf $(MAIN_CSS) $(OUTPUT)/*
+	rm -rf $(MAIN_CSS) $(TEXTEDIT_JS) $(OUTPUT)/*

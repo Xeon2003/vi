@@ -1,258 +1,469 @@
-import html5
+# -*- coding: utf-8 -*-
+import html5, re, json
 from widgets.actionbar import ActionBar
-from event import EventDispatcher
-from time import time
-from priorityqueue import actionDelegateSelector
-import re
-from config import conf
 from widgets.file import FileWidget
+
+from event import EventDispatcher
+from priorityqueue import actionDelegateSelector
+from config import conf
 from i18n import translate
+from network import DeferredCall
+
+from __pyjamas__ import JS
 
 class BasicEditorAction(html5.ext.Button):
-
-	def execCommand(self, *args, **kwargs):
-		return self.parent().parent().editor.execCommand(*args, **kwargs)
-
-class BasicTextAction(BasicEditorAction):
 	cmd = None
-	isActiveTag = None
+	name = None
+	value = True
 	title = None
 
+	isActiveTag = None
+
 	def __init__(self, *args, **kwargs):
-		assert self.cmd is not None
-		super( BasicTextAction, self ).__init__( self.cmd, *args, **kwargs )
-		self["class"] = "icon text style"
-		self["class"].append( self.cmd )
+		super(BasicEditorAction, self).__init__(self.cmd, *args, **kwargs)
+
+		self.removeClass("button") # dont use default button class here
+		self.addClass("btn-vTextedit", self.cmd) #, "ql-%s" % self.name)
+
 		if self.title:
 			self["title"] = self.title
+		else:
+			self["title"] = self.cmd
+		
+		self.setText('<img src="/vi/s/icons/actions/text/' + self.cmd.lower() + '.svg" alt="' + self["title"] + '">')
+
+	def getQuill(self):
+		return self.parent().parent().parent().editor.quill
+
+	def onClick(self, sender = None):
+		q = self.getQuill()
+
+		fmt = q.getFormat()
+
+		value = getattr(fmt, self.name, not self.value)
+		if value == self.value:
+			value = not value
+		else:
+			value = self.value
+
+		print("clicked on button %s[%s]" % (self.name, value))
+		q.format(self.name, value)
 
 	def onAttach(self):
-		super(BasicTextAction, self).onAttach( )
-		if self.isActiveTag:
-			self.parent().parent().cursorMovedEvent.register( self )
+		self.parent().parent().parent().editor.editorChangeEvent.register(self)
 
 	def onDetach(self):
-		super(BasicTextAction, self).onDetach( )
-		if self.isActiveTag:
-			self.parent().parent().cursorMovedEvent.unregister( self )
+		self.parent().parent().parent().editor.editorChangeEvent.unregister(self)
 
-	def onCursorMoved(self, nodeStack):
-		if self.isActiveTag in [(x.tagName if "tagName" in dir(x) else "") for x in nodeStack]:
-			if not "isactive" in self["class"]:
-				self["class"].append("isactive")
-		else:
-			if "isactive" in self["class"]:
-				self["class"].remove("isactive")
-
-	def onClick(self, sender=None):
-		self.execCommand(self.cmd)
-
-	def resetLoadingState(self):
-		pass
+	def onEditorChange(self):
+		q = self.getQuill()
+	
+		try:
+			fmt = q.getFormat()
+		except:
+			return
+		
+		self.removeClass("is-active")
+		if getattr(fmt, self.name, None):
+			value = getattr(fmt, self.name, None)
+			if value == "True" or self.value == value and self.name != "indent":
+				self.addClass("is-active")
 
 
-class TextStyleBold( BasicTextAction ):
-	cmd = "bold"
-	isActiveTag = "B"
+
+class TextStyleBold(BasicEditorAction):
+	name = cmd = "bold"
 	title = translate("Bold")
 
-	#def onClick(self, sender = None):
-	#	self.parent().parent().editor.toggleSelection("strong")
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="style.text.bold", TextStyleBold )
 
-actionDelegateSelector.insert( 1, lambda modul, handler, actionName: actionName=="style.text.bold", TextStyleBold )
-
-class TextStyleItalic( BasicTextAction ):
-	cmd = "italic"
-	isActiveTag = "I"
+class TextStyleItalic(BasicEditorAction):
+	name = cmd = "italic"
 	title = translate("Italic")
 
-	#def onClick(self, sender=None):
-	#	self.parent().parent().editor.toggleSelection("em")
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="style.text.italic", TextStyleItalic )
 
-actionDelegateSelector.insert( 1, lambda modul, handler, actionName: actionName=="style.text.italic", TextStyleItalic )
+class TextStyleSuper(BasicEditorAction):
+	cmd = "Super"
+	name = "subsuper"
+	value = "Sup"
+	title = translate("Super")
 
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="style.text.super", TextStyleSuper )
 
-class BasicFormatBlockAction( BasicTextAction ):
-	def onClick(self, sender=None):
-		self.execCommand("formatBlock", self.cmd)
+class TextStyleSub(BasicEditorAction):
+	cmd = "Sub"
+	name = "subsuper"
+	value = "Sub"
+	title = translate("Sub")
 
-class TextStyleH1( BasicFormatBlockAction ):
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="style.text.sub", TextStyleSub )
+
+class TextStyleH1(BasicEditorAction):
 	cmd = "H1"
+	name = "header"
+	value = 1
 	title = translate("H1")
 
-actionDelegateSelector.insert( 1, lambda modul, handler, actionName: actionName=="style.text.h1", TextStyleH1 )
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="style.text.h1", TextStyleH1 )
 
-class TextStyleH2( BasicFormatBlockAction ):
+class TextStyleH2(BasicEditorAction):
 	cmd = "H2"
+	name = "header"
+	value = 2
 	title = translate("H2")
 
-actionDelegateSelector.insert( 1, lambda modul, handler, actionName: actionName=="style.text.h2", TextStyleH2 )
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="style.text.h2", TextStyleH2 )
 
-class TextStyleH3( BasicFormatBlockAction ):
+class TextStyleH3(BasicEditorAction):
 	cmd = "H3"
+	name = "header"
+	value = 3
 	title = translate("H3")
 
-actionDelegateSelector.insert( 1, lambda modul, handler, actionName: actionName=="style.text.h3", TextStyleH3 )
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="style.text.h3", TextStyleH3 )
 
-class TextStyleH4( BasicFormatBlockAction ):
+class TextStyleH4(BasicEditorAction):
 	cmd = "H4"
+	name = "header"
+	value = 4
 	title = translate("H4")
 
-actionDelegateSelector.insert( 1, lambda modul, handler, actionName: actionName=="style.text.h4", TextStyleH4 )
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="style.text.h4", TextStyleH4 )
 
-class TextStyleH5( BasicFormatBlockAction ):
-	cmd = "H5"
-	title = translate("H5")
-
-actionDelegateSelector.insert( 1, lambda modul, handler, actionName: actionName=="style.text.h5", TextStyleH5 )
-
-class TextStyleH6( BasicFormatBlockAction ):
-	cmd = "H6"
-	title = translate("H6")
-
-actionDelegateSelector.insert( 1, lambda modul, handler, actionName: actionName=="style.text.h6", TextStyleH6 )
-
-
-class TextStyleBlockQuote( BasicFormatBlockAction ):
-	cmd = "BLOCKQUOTE"
+class TextStyleBlockQuote(BasicEditorAction):
+	name = cmd = "blockquote"
 	title = translate("Blockqoute")
-#actionDelegateSelector.insert( 1, lambda modul, handler, actionName: actionName=="style.text.blockquote", TextStyleBlockQuote )
 
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="style.text.blockquote", TextStyleBlockQuote )
 
-class TextStyleJustifyCenter( BasicTextAction ):
-	cmd = "justifyCenter"
-	title = translate("Justifiy Center")
-actionDelegateSelector.insert( 1, lambda modul, handler, actionName: actionName=="style.text.justifyCenter", TextStyleJustifyCenter )
+class TextInsertDivider(BasicEditorAction):
+	name = cmd = "divider"
+	title = translate("Divider")
 
-class TextStyleJustifyLeft( BasicTextAction ):
-	cmd = "justifyLeft"
-	title = translate("Justifiy Left")
-actionDelegateSelector.insert( 1, lambda modul, handler, actionName: actionName=="style.text.justifyLeft", TextStyleJustifyLeft )
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="text.divider", TextInsertDivider )
 
-class TextStyleJustifyRight( BasicTextAction ):
-	cmd = "justifyRight"
-	title = translate("Justifiy Right")
-actionDelegateSelector.insert( 1, lambda modul, handler, actionName: actionName=="style.text.justifyRight", TextStyleJustifyRight )
+class TextStyleAlignCenter(BasicEditorAction):
+	cmd = "alignCenter"
+	name = "align"
+	value = "Center"
+	title = translate("Align Center")
 
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="style.text.alignCenter", TextStyleAlignCenter )
 
+class TextStyleAlignLeft(BasicEditorAction):
+	cmd = "alignLeft"
+	name = "align"
+	value = "Left"
+	title = translate("Align Left")
 
-class TextInsertOrderedList( BasicTextAction ):
-	cmd = "insertOrderedList"
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="style.text.alignLeft", TextStyleAlignLeft )
+
+class TextStyleAlignRight(BasicEditorAction):
+	cmd = "alignRight"
+	name = "align"
+	value = "Right"
+	title = translate("Align Right")
+
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="style.text.alignRight", TextStyleAlignRight )
+
+class TextStyleAlignJustify(BasicEditorAction):
+	cmd = "alignJustify"
+	name = "align"
+	value = "Justify"
+	title = translate("Align Justify")
+
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="style.text.alignJustify", TextStyleAlignJustify )
+
+class TextInsertOrderedList(BasicEditorAction):
+	cmd = "orderedList"
+	name = "list"
+	value = "ordered"
 	title = translate("Insert an ordered List")
-actionDelegateSelector.insert( 1, lambda modul, handler, actionName: actionName=="text.orderedList", TextInsertOrderedList )
 
-class TextInsertUnorderedList( BasicTextAction ):
-	cmd = "insertUnorderedList"
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="text.orderedList", TextInsertOrderedList )
+
+class TextInsertUnorderedList(BasicEditorAction):
+	cmd = "unorderedList"
+	name = "list"
+	value = "bullet"
 	title = translate("Insert an unordered List")
-actionDelegateSelector.insert( 1, lambda modul, handler, actionName: actionName=="text.unorderedList", TextInsertUnorderedList )
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="text.unorderedList", TextInsertUnorderedList )
 
-
-
-
-class TextIndent( BasicTextAction ):
-	cmd = "indent"
-	title = translate("Indent more")
-actionDelegateSelector.insert( 1, lambda modul, handler, actionName: actionName=="text.indent", TextIndent )
-
-
-class TextOutdent( BasicTextAction ):
+class TextOutdent(BasicEditorAction):
 	cmd = "outdent"
+	name = "indent"
+	value = "-1"
 	title = translate("Indent less")
-actionDelegateSelector.insert( 1, lambda modul, handler, actionName: actionName=="text.outdent", TextOutdent )
+
+	def onClick(self, sender = None):
+		q = self.getQuill()
+		fmt = q.getFormat()
+		value = getattr(fmt, self.name, "0")
+		r = q.getSelection()
+
+	   	q.formatLine(r.index, r.length, "indent", int(value) - 1)
+
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="text.outdent", TextOutdent )
+
+class TextIndent(BasicEditorAction):
+	name = cmd = "indent"
+	value = "+1"
+	title = translate("Indent more")
 
 
+	def onClick(self, sender = None):
+		q = self.getQuill()
+		fmt = q.getFormat()
+		value = getattr(fmt, self.name, "0")
+		r = q.getSelection()
 
-class TextRemoveFormat( BasicTextAction ):
+	   	q.formatLine(r.index, r.length, "indent", int(value) + 1)
+
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="text.indent", TextIndent )
+
+class TextRemoveFormat(BasicEditorAction):
 	cmd = "removeformat"
+	name = "clean"
 	title = translate("Remove all formatting")
 
+	def onClick(self, sender = None):
+		q = self.getQuill()
+
+		r = q.getSelection()
+		if r.length > 0:
+		   	q.removeFormat(r.index, r.length, "user")
+
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="text.removeformat", TextRemoveFormat )
+
+# --- Images -----------------------------------------------------------------------------------------------------------
+
+'''
+class FileSelectDialog(html5.ext.Popup):
+	def __init__(self, notifier=None, title="", alt="", additionalClass="", *args, **kwargs):
+		super(FileSelectDialog, self).__init__(*args, **kwargs)
+
+		currentSelector = FileWidget( "file", isSelector=True )
+		currentSelector.selectionActivatedEvent.register(self)
+
+		self.appendChild(currentSelector)
+
+		# Title
+		lbl = html5.Label()
+		lbl.appendChild(translate("Title"))
+		
+		self.titleInput = html5.Input()
+		self.titleInput["value"] = title
+		lbl.appendChild(self.titleInput)
+		self.appendChild(lbl)
+		
+		# Class
+		lbl = html5.Label()
+		lbl.appendChild(translate("Class"))
+
+		self.classSelect = html5.Select()
+		for c in ["vitxt-image-left", "vitxt-image-right", "vitxt-image-block"]:
+			opt = html5.Option()
+			opt["value"] = c
+			opt.appendChild(c)
+
+			if c == additionalClass:
+				opt["selected"] = True
+
+			self.classSelect.appendChild(opt)
+
+		lbl.appendChild(self.classSelect)
+		self.appendChild(lbl)
+
+		# Alt
+		lbl = html5.Label()
+		lbl.appendChild(translate("Alt"))
+		
+		self.altInput = html5.Input()
+		self.altInput["value"] = alt
+		lbl.appendChild(self.altInput)
+		self.appendChild(lbl)
+
+		# Buttons
+		btnOk = html5.ext.Button(translate("OK"), callback=self.onOkBtnClicked)
+		btnOk.addClass("btn_yes")
+		self.appendChild(btnOk)
+
+		btnCancel = html5.ext.Button(translate("Cancel"), callback=self.close)
+		btnCancel.addClass("btn_no")
+		self.appendChild(btnCancel)
+
+	def selectionActivatedEvent(self, selectWdg, selection)
+		self.select
+
+	def onOkBtnClicked(self, sender = None):
+		self.close()
+'''
+	
+class TextInsertImageAction(BasicEditorAction):
+	name = cmd = "image"
+	title = translate("Insert Image")
+
 	def onClick(self, sender=None):
-		self.execCommand(self.cmd)
+		#FileSelectDialog(successHandler=self.onFileSelectionAvailable)
 
-		node = eval("window.top.getSelection().anchorNode")
+		self.currentSelector = FileWidget( "file", isSelector=True )
+		self.currentSelector.selectionActivatedEvent.register(self)
+		conf["mainWindow"].stackWidget(self.currentSelector)
 
-		i = 10
-		while i>0 and node and node != self.parent().parent().editor.element:
-			i -= 1
+	def onSelectionActivated(self, widget, selection):
+			conf["mainWindow"].removeWidget(self.currentSelector)
 
-			if not "tagName" in dir( node ):
-				node = node.parentNode
-				continue
-
-			if node.tagName in ["H%s" % x for x in range(0,6)]:
-				self.execCommand("formatBlock", "div")
+			if not selection:
 				return
 
-			node = node.parentNode
-
-actionDelegateSelector.insert( 1, lambda modul, handler, actionName: actionName=="text.removeformat", TextRemoveFormat )
-
-
-
-
-
-class TextInsertImageAction(BasicEditorAction):
-	def __init__(self, *args, **kwargs):
-		super( TextInsertImageAction, self ).__init__( translate("Insert Image"), *args, **kwargs )
-		self["class"] = "icon text image"
-		self["title"] = translate("Insert Image")
-
-	def onClick(self, sender=None):
-		currentSelector = FileWidget( "file", isSelector=True )
-		currentSelector.selectionActivatedEvent.register( self )
-		conf["mainWindow"].stackWidget( currentSelector )
-
-	def onSelectionActivated(self, selectWdg, selection):
-		print("onSelectionActivated")
-
-		if not selection:
-			return
-
-		print(selection)
-
-		for item in selection:
-			dataUrl = "/file/download/%s/%s" % (item.data["dlkey"], item.data["name"].replace("\"",""))
-			if "mimetype" in item.data.keys() and item.data["mimetype"].startswith("image/"):
-				self.execCommand("insertImage", dataUrl)
-			else:
-				self.execCommand("createLink", dataUrl + "?download=1")
+			for item in selection:
+				dataUrl = "/file/download/%s/%s" % (item.data["dlkey"], item.data["name"].replace("\"",""))
+				if "mimetype" in item.data.keys() and item.data["mimetype"].startswith("image/"):	
+					data = json.dumps({"url": dataUrl, "alt": item.data["name"]})
+					self.getQuill().format("image", JS("JSON.parse(@{{data}})"))
+				else:
+					data = json.dumps({"href": dataUrl + "?download=1", "title": item.data["name"], "isDownload": "True"})
+					self.getQuill().format("link", JS("JSON.parse(@{{data}})"))
 
 	@staticmethod
-	def isSuitableFor( modul, handler, actionName ):
+	def isSuitableFor( module, handler, actionName ):
 		return( actionName=="text.image" )
 
 	def resetLoadingState(self):
 		pass
 
-actionDelegateSelector.insert( 1, TextInsertImageAction.isSuitableFor, TextInsertImageAction )
+actionDelegateSelector.insert(1, TextInsertImageAction.isSuitableFor, TextInsertImageAction )
+
+
+# --- Links ------------------------------------------------------------------------------------------------------------
+
+class LinkEditDialog(html5.ext.Popup):
+	def __init__(self, href="", target="", title="", successHandler=None, quill=None, *args, **kwargs):
+		super(LinkEditDialog, self).__init__(*args, **kwargs)
+
+		self.successHandler = successHandler
+		self.quill = quill
+		self.addClass("linkDialog")
+
+		# URL
+		lbl = html5.Label()
+		lbl.appendChild(translate("URL"))
+		
+		self.urlInput = html5.Input()
+		self.urlInput["value"] = href
+		lbl.appendChild(self.urlInput)
+		self.appendChild(lbl)
+
+		# Target
+		lbl = html5.Label()
+		lbl.appendChild(translate("Target"))
+
+		self.targetSelect = html5.Select()
+		for t in ["", "_blank", "_self", "_parent", "_top"]:
+			opt = html5.Option()
+			opt["value"] = t
+			opt.appendChild(t)
+
+			if t == target:
+				opt["selected"] = True
+
+			self.targetSelect.appendChild(opt)
+
+		lbl.appendChild(self.targetSelect)
+		self.appendChild(lbl)
+
+		# Title
+		lbl = html5.Label()
+		lbl.appendChild(translate("Title"))
+		
+		self.titleInput = html5.Input()
+		self.titleInput["value"] = title
+		lbl.appendChild(self.titleInput)
+		self.appendChild(lbl)
+
+		# Buttons
+		btnOk = html5.ext.Button(translate("OK"), callback=self.onOkBtnClicked)
+		btnOk.addClass("btn_yes")
+		self.appendChild(btnOk)
+
+		btnCancel = html5.ext.Button(translate("Cancel"), callback=self.close)
+		btnCancel.addClass("btn_no")
+		self.appendChild(btnCancel)
+
+	def onOkBtnClicked(self, sender = None):
+		if self.successHandler:
+			url = self.urlInput["value"]
+			if url and not url.startswith('/file/') and not url.startswith('http'):
+				url = 'http://' + url
+
+			self.successHandler(
+				href=url, 
+				target=self.targetSelect.children(self.targetSelect["selectedIndex"])["value"],
+				title=self.titleInput["value"])
+			self.close()
+
 
 class TextInsertLinkAction(BasicEditorAction):
-	newLinkIdx = 0
-	def __init__(self, *args, **kwargs):
-		super( TextInsertLinkAction, self ).__init__( translate("Insert Link"), *args, **kwargs )
-		self["class"] = "icon text link"
-		self["title"] = translate("Insert Link")
+	name = cmd = "link"
+	title = translate("Insert Link")
 
 	def onClick(self, sender=None):
-		newLinkTarget = "#linkidx-%s-%s" % (TextInsertLinkAction.newLinkIdx, time() )
+		q = self.getQuill()
+		r = q.getSelection()
+		if r.length > 0:
+			data = getattr(self.getQuill().getFormat(), self.name, "")
+			data = json.loads(JS("JSON.stringify(@{{data}})"))
 
-		self.execCommand("createLink", "#%s" % newLinkTarget)
-		self.parent().parent().linkEditor.openLink(newLinkTarget)
+			LinkEditDialog(successHandler=self.onLinkAvailable, **data)
 
-	def createLink(self, dialog, value):
-		if value:
-			self.parent().parent().editor.focus()
+	def onLinkAvailable(self, **data):
+		data = json.dumps(data)
+		self.getQuill().format("link", JS("JSON.parse(@{{data}})"))
 
 	@staticmethod
-	def isSuitableFor( modul, handler, actionName ):
-		return( actionName=="text.link" )
+	def isSuitableFor( module, handler, actionName ):
+		return actionName=="text.link"
 
 	def resetLoadingState(self):
 		pass
 
-actionDelegateSelector.insert( 1, TextInsertLinkAction.isSuitableFor, TextInsertLinkAction )
+class LinkEditor(html5.ext.Popup):
+	def __init__(self, value=None, quill=None, left=500, top=200, *args, **kwargs):
+		super( LinkEditor, self ).__init__(*args, **kwargs)
+
+		self.value = value
+		self.addClass("linkEditor")
+		self.parent().removeClass("popup")
+		self.element.setAttribute("style", "left:" + str(left) + "px;top:" + str(top) + "px;")
+
+		# hint
+		hint = html5.Span()
+		hint.appendChild(value.href)
+		self.appendChild(hint)
+		
+		# Buttons
+		btnEdit = html5.ext.Button(translate("edit"), callback=self.onEditBtnClicked)
+		btnEdit.addClass("icon edit")
+		hint.appendChild(btnEdit)
+
+	def onEditBtnClicked(self, sender = None):
+		value = self.value
+		data = json.loads(JS("JSON.stringify(@{{value}})"))
+
+		LinkEditDialog(successHandler=self.onLinkAvailable, **data)
+		self.close()
+
+	def onLinkAvailable(self, **data):
+		q = JS("parent.myQuill")
+		data = json.dumps(data)
+		q.format("link", JS("JSON.parse(@{{data}})"))
+		eval("parent.lastSelection.index = parent.lastSelection.length = 0;")
+
+actionDelegateSelector.insert(1, TextInsertLinkAction.isSuitableFor, TextInsertLinkAction )
 
 
+'''
 class CreateTablePopup( html5.ext.Popup ):
 	def __init__(self, targetNode, *args, **kwargs ):
 		super( CreateTablePopup, self ).__init__( *args, **kwargs )
@@ -323,13 +534,13 @@ class TextInsertTableAction( html5.ext.Button ):
 			CreateTablePopup( node )
 
 	@staticmethod
-	def isSuitableFor( modul, handler, actionName ):
+	def isSuitableFor( module, handler, actionName ):
 		return( actionName=="text.table" )
 
 	def resetLoadingState(self):
 		pass
 
-actionDelegateSelector.insert( 1, TextInsertTableAction.isSuitableFor, TextInsertTableAction )
+actionDelegateSelector.insert(1, TextInsertTableAction.isSuitableFor, TextInsertTableAction )
 
 class TableInsertRowBeforeAction( html5.ext.Button ):
 	def __init__(self, *args, **kwargs):
@@ -355,13 +566,13 @@ class TableInsertRowBeforeAction( html5.ext.Button ):
 			node = node.parentNode
 
 	@staticmethod
-	def isSuitableFor( modul, handler, actionName ):
+	def isSuitableFor( module, handler, actionName ):
 		return( actionName=="text.table.newrow.before" )
 
 	def resetLoadingState(self):
 		pass
 
-actionDelegateSelector.insert( 1, TableInsertRowBeforeAction.isSuitableFor, TableInsertRowBeforeAction )
+actionDelegateSelector.insert(1, TableInsertRowBeforeAction.isSuitableFor, TableInsertRowBeforeAction )
 
 class TableInsertRowAfterAction( html5.ext.Button ):
 	def __init__(self, *args, **kwargs):
@@ -390,13 +601,13 @@ class TableInsertRowAfterAction( html5.ext.Button ):
 			node = node.parentNode
 
 	@staticmethod
-	def isSuitableFor( modul, handler, actionName ):
+	def isSuitableFor( module, handler, actionName ):
 		return( actionName=="text.table.newrow.after" )
 
 	def resetLoadingState(self):
 		pass
 
-actionDelegateSelector.insert( 1, TableInsertRowAfterAction.isSuitableFor, TableInsertRowAfterAction )
+actionDelegateSelector.insert(1, TableInsertRowAfterAction.isSuitableFor, TableInsertRowAfterAction )
 
 class TableInsertColBeforeAction( html5.ext.Button ):
 	def __init__(self, *args, **kwargs):
@@ -454,14 +665,13 @@ class TableInsertColBeforeAction( html5.ext.Button ):
 							child.insertBefore( newTd, child.children.item(cellIdx) )
 
 	@staticmethod
-	def isSuitableFor( modul, handler, actionName ):
+	def isSuitableFor( module, handler, actionName ):
 		return( actionName=="text.table.newcol.before" )
 
 	def resetLoadingState(self):
 		pass
 
-
-actionDelegateSelector.insert( 1, TableInsertColBeforeAction.isSuitableFor, TableInsertColBeforeAction )
+actionDelegateSelector.insert(1, TableInsertColBeforeAction.isSuitableFor, TableInsertColBeforeAction )
 
 class TableInsertColAfterAction( html5.ext.Button ):
 	def __init__(self, *args, **kwargs):
@@ -525,14 +735,13 @@ class TableInsertColAfterAction( html5.ext.Button ):
 								child.appendChild( newTd )
 
 	@staticmethod
-	def isSuitableFor( modul, handler, actionName ):
+	def isSuitableFor( module, handler, actionName ):
 		return( actionName=="text.table.newcol.after" )
 
 	def resetLoadingState(self):
 		pass
 
-actionDelegateSelector.insert( 1, TableInsertColAfterAction.isSuitableFor, TableInsertColAfterAction )
-
+actionDelegateSelector.insert(1, TableInsertColAfterAction.isSuitableFor, TableInsertColAfterAction )
 
 class TableRemoveRowAction( html5.ext.Button ):
 	def __init__(self, *args, **kwargs):
@@ -554,15 +763,13 @@ class TableRemoveRowAction( html5.ext.Button ):
 			node = node.parentNode
 
 	@staticmethod
-	def isSuitableFor( modul, handler, actionName ):
+	def isSuitableFor( module, handler, actionName ):
 		return( actionName=="text.table.remove.row" )
 
 	def resetLoadingState(self):
 		pass
 
-actionDelegateSelector.insert( 1, TableRemoveRowAction.isSuitableFor, TableRemoveRowAction )
-
-
+actionDelegateSelector.insert(1, TableRemoveRowAction.isSuitableFor, TableRemoveRowAction )
 
 class TableRemoveColAction( html5.ext.Button ):
 	def __init__(self, *args, **kwargs):
@@ -618,250 +825,84 @@ class TableRemoveColAction( html5.ext.Button ):
 							child.removeChild(child.children.item(cellIdx))
 
 	@staticmethod
-	def isSuitableFor( modul, handler, actionName ):
+	def isSuitableFor( module, handler, actionName ):
 		return( actionName=="text.table.remove.col" )
 
 	def resetLoadingState(self):
 		pass
 
-actionDelegateSelector.insert( 1, TableRemoveColAction.isSuitableFor, TableRemoveColAction )
+actionDelegateSelector.insert(1, TableRemoveColAction.isSuitableFor, TableRemoveColAction )
+'''
 
 class TextSaveAction( html5.ext.Button ):
 	def __init__(self, *args, **kwargs):
 		super( TextSaveAction, self ).__init__( translate("Save"), *args, **kwargs )
-		self["class"] = "icon text save"
+		self["class"] = "btn-vTextedit save f-right"
 		self["title"] = translate("Save")
+		self.setText('<img src="/vi/s/icons/actions/text/save.svg">')
 
 	def onClick(self, event):
-		self.parent().parent().saveText()
+		self.parent().parent().parent().saveText()
 
 	@staticmethod
-	def isSuitableFor( modul, handler, actionName ):
+	def isSuitableFor( module, handler, actionName ):
 		return( actionName=="text.save" )
 
-actionDelegateSelector.insert( 1, TextSaveAction.isSuitableFor, TextSaveAction )
+actionDelegateSelector.insert(1, TextSaveAction.isSuitableFor, TextSaveAction )
 
 class TextAbortAction( html5.ext.Button ):
 	def __init__(self, *args, **kwargs):
 		super( TextAbortAction, self ).__init__( translate("Abort"), *args, **kwargs )
-		self["class"] = "icon text abort"
+		self["class"] = "btn-vTextedit abort f-right"
 		self["title"] = translate("Abort")
+		self.setText('<img src="/vi/s/icons/actions/text/cancel.svg">')
 
 	def onClick(self, event):
-		if self.parent().parent().editor.changed():
+		if self.parent().parent().parent().editor.changed():
 			html5.ext.popup.YesNoDialog(translate("Any changes will be lost. Do you really want to abort?"),
 			                            yesCallback=self.doAbort)
 		else:
 			self.doAbort()
 
 	def doAbort(self, *args, **kwargs):
-		self.parent().parent().abortText()
+		self.parent().parent().parent().abortText()
 
 	@staticmethod
-	def isSuitableFor( modul, handler, actionName ):
+	def isSuitableFor( module, handler, actionName ):
 		return( actionName=="text.abort" )
 
-actionDelegateSelector.insert( 1, TextAbortAction.isSuitableFor, TextAbortAction )
-
-class LinkEditor( html5.Div ):
-	newLinkIdx = 0
-	def __init__(self, *args, **kwargs):
-		super( LinkEditor, self ).__init__( *args, **kwargs )
-		self["class"].append("linkeditor")
-		self["style"]["display"] = "none"
-		self.linkTxt = html5.Input()
-		self.linkTxt["type"] = "text"
-		self.appendChild(self.linkTxt)
-		l = html5.Label(translate("URL"), forElem=self.linkTxt)
-		l["class"].append("urllbl")
-		self.appendChild( l )
-		self.newTab = html5.Input()
-		self.newTab["type"] = "checkbox"
-		self.appendChild(self.newTab)
-		l = html5.Label(translate("New window"), forElem=self.newTab)
-		l["class"].append("newwindowlbl")
-		self.appendChild( l )
-		self.currentElem = None
-
-	def getAFromTagStack(self, tagStack):
-		for elem in tagStack:
-			if not "tagName" in dir(elem):
-				continue
-			if elem.tagName=="A":
-				return( elem )
-		return( None )
-
-	def onCursorMoved(self, tagStack):
-		newElem = self.getAFromTagStack(tagStack)
-		if newElem is not None and self.currentElem is not None:
-			self.doClose()
-			self.doOpen( newElem )
-		elif self.currentElem is None and newElem is not None:
-			self.doOpen( newElem )
-		elif self.currentElem is not None and newElem is None:
-			self.doClose()
-
-	def doOpen(self, elem):
-		self.currentElem = elem
-		self.linkTxt["value"] = self.currentElem.href
-		self.newTab["checked"] = self.currentElem.target=="_blank"
-
-		self.isOpen = True
-		self["style"]["display"] = "block"
-
-	def doClose(self):
-		if self.currentElem is None:
-			return
-		self.currentElem.href = self.linkTxt["value"]
-
-		if self.newTab["checked"]:
-			self.currentElem.target = "_blank"
-		else:
-			self.currentElem.target = "_self"
-
-		self["style"]["display"] = "none"
-		self.currentElem = None
-
-	def findHref(self, linkTarget, elem):
-		if "tagName" in dir(elem):
-			if elem.tagName == "A":
-				if elem.href == linkTarget or elem.href.endswith(linkTarget):
-					return( elem )
-		if "children" in dir(elem):
-			for x in range(0,elem.children.length):
-				child = elem.children.item(x)
-				r = self.findHref( linkTarget, child)
-				if r is not None:
-					return( r )
-		return( None )
-
-	def openLink(self, linkTarget):
-		self.doOpen( self.findHref( linkTarget, self.parent().editor.element ) )
-		self.linkTxt["value"] = ""
-		self.linkTxt.focus()
+actionDelegateSelector.insert(1, TextAbortAction.isSuitableFor, TextAbortAction )
 
 
-class ImageEditor( html5.Div ):
-	def __init__(self, *args, **kwargs):
-		super( ImageEditor, self ).__init__( *args, **kwargs )
-		self["class"].append("imageeditor")
-		self["style"]["display"] = "none"
-		self.widthInput = html5.Input()
-		self.widthInput["type"] = "number"
-		self.appendChild(self.widthInput)
-		l = html5.Label(translate("Width"), self.widthInput)
-		l["class"].append("widthlbl")
-		self.appendChild( l )
-		self.keepAspectRatio = html5.Input()
-		self.keepAspectRatio["type"] = "checkbox"
-		self.appendChild( self.keepAspectRatio )
-		l = html5.Label(translate("Keep aspect ratio"), self.keepAspectRatio)
-		l["class"].append("aspectlbl")
-		self.appendChild( l )
-		self.heightInput = html5.Input()
-		self.heightInput["type"] = "number"
-		self.appendChild(self.heightInput)
-		l = html5.Label(translate("Height"), self.heightInput)
-		l["class"].append("heightlbl")
-		self.appendChild( l )
-		self.titleInput = html5.Input()
-		self.titleInput["type"] = "text"
-		self.appendChild(self.titleInput)
-		l = html5.Label(translate("Title"), self.titleInput)
-		l["class"].append("titlelbl")
-		self.appendChild( l )
-		self.currentElem = None
-		self.sinkEvent("onChange")
-
-	def onChange(self, event):
-		super(ImageEditor,self).onChange( event )
-		aspect = self.currentElem.naturalWidth/self.currentElem.naturalHeight
-		if event.target == self.widthInput.element:
-			if self.keepAspectRatio["checked"]:
-				self.heightInput["value"] = int(float(self.widthInput["value"])/aspect)
-		elif event.target == self.heightInput.element:
-			if self.keepAspectRatio["checked"]:
-				self.widthInput["value"] = int(float(self.heightInput["value"])*aspect)
-		self.currentElem.width = int(self.widthInput["value"])
-		self.currentElem.height = int(self.heightInput["value"])
-
-	def getImgFromTagStack(self, tagStack):
-		for elem in tagStack:
-			if not "tagName" in dir(elem):
-				continue
-			if elem.tagName=="IMG":
-				return( elem )
-		return( None )
-
-	def onCursorMoved(self, tagStack):
-		newElem = self.getImgFromTagStack(tagStack)
-		if newElem is not None and self.currentElem is not None:
-			self.doClose()
-			self.doOpen( newElem )
-		elif self.currentElem is None and newElem is not None:
-			self.doOpen( newElem )
-		elif self.currentElem is not None and newElem is None:
-			self.doClose()
-
-	def doOpen(self, elem):
-		self.currentElem = elem
-		self["style"]["display"] = ""
-		self.heightInput["value"] = elem.height
-		self.widthInput["value"] = elem.width
-		self.titleInput["value"] = elem.title
-
-	def doClose(self):
-		if self.currentElem is None:
-			return
-		self.currentElem.width = int( self.widthInput["value"] )
-		self.currentElem.height = int( self.heightInput["value"] )
-		self.currentElem.title = self.titleInput["value"]
-		self["style"]["display"] = "none"
-		self.currentElem = None
-
-	def findImg(self, linkTarget, elem):
-		if "tagName" in dir(elem):
-			if elem.tagName == "IMG":
-				if elem.href == linkTarget or elem.href.endswith(linkTarget):
-					return( elem )
-		if "children" in dir(elem):
-			for x in range(0,elem.children.length):
-				child = elem.children.item(x)
-				r = self.findImg( linkTarget, child)
-				if r is not None:
-					return( r )
-		return( None )
-
-	def openLink(self, linkTarget):
-		self.doOpen( self.findHref( linkTarget, self.parent().editor.element ) )
-		self.linkTxt["value"] = ""
-		self.linkTxt.focus()
-
-
-class TextUndoAction( BasicTextAction ):
+class TextUndoAction(BasicEditorAction):
 	cmd = "undo"
 	title = translate("Undo the last action")
 
-actionDelegateSelector.insert( 1, lambda modul, handler, actionName: actionName=="text.undo", TextUndoAction )
+	def onClick(self, sender = None):
+		self.getQuill().history.undo()
 
-class TextRedoAction( BasicTextAction ):
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="text.undo", TextUndoAction )
+
+class TextRedoAction( BasicEditorAction ):
 	cmd = "redo"
 	title = translate("Redo the last undone action")
 
-actionDelegateSelector.insert( 1, lambda modul, handler, actionName: actionName=="text.redo", TextRedoAction )
+	def onClick(self, sender=None):
+		self.getQuill().history.redo()
 
-
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="text.redo", TextRedoAction )
 
 
 class FlipViewAction( html5.ext.Button ):
 	def __init__(self, *args, **kwargs):
 		super( FlipViewAction, self ).__init__( translate("Flip View"), *args, **kwargs )
-		self["class"] = "icon flipview"
+		self["class"] = "btn-vTextedit flipview"
 		self["title"] = translate("Flip View")
+		self.setText('<img src="/vi/s/icons/actions/text/code.svg">')
 
 	def onAttach(self):
 		super( FlipViewAction, self ).onAttach()
-		if self.parent().parent().isWysiwygMode:
+		if self.parent().parent().parent().isWysiwygMode:
 			self["class"].append("is_wysiwyg")
 		else:
 			self["class"].append("is_htmlview")
@@ -872,75 +913,110 @@ class FlipViewAction( html5.ext.Button ):
 		if "is_htmlview" in self["class"]:
 			self["class"].remove("is_htmlview")
 
-		if self.parent().parent().flipView():
+		if self.parent().parent().parent().flipView():
 			self["class"].append("is_wysiwyg")
 		else:
 			self["class"].append("is_htmlview")
 
 	def resetLoadingState(self):
 		pass
-actionDelegateSelector.insert( 1, lambda modul, handler, actionName: actionName=="text.flipView", FlipViewAction )
+actionDelegateSelector.insert(1, lambda module, handler, actionName: actionName=="text.flipView", FlipViewAction )
+
+
+def dumpNode(obj):
+	try:
+		print("obj", obj)
+		print("type", obj.nodeType)
+		print("child", obj.childElementCount)
+
+		div = html5.Div()
+		div.element.appendChild(obj.cloneNode(True))
+		print("html", div.element.innerHTML)
+		print("children", div.element.childNodes.length)
+		print("children[1]", obj.childNodes.length)
+	except:
+		print("ERROR DUMPING %s" % obj)
+
 
 class Editor(html5.Div):
-	def __init__(self, html, *args, **kwargs ):
-		super(Editor, self).__init__(*args, **kwargs)
+	__editorCount__ = 0
 
-		self["contenteditable"] = True
+	def __init__(self, parent, html, *args, **kwargs ):
+		super(Editor, self).__init__(*args, **kwargs)
 		self.addClass("contentdiv")
 
+		self["id"] = "wysiwyg%d" % Editor.__editorCount__
+		Editor.__editorCount__ += 1
+
 		self.initial_txt = self.element.innerHTML = html
-		self.sinkEvent("onBlur", "onFocus", "onKeyDown")
+		self.sinkEvent("onBlur", "onFocus")
+		parent.appendChild(self)
+		self.quill = None
+
+		self.editorChangeEvent = EventDispatcher("editorChange")
+		DeferredCall(self.init)
+
+	def init(self):
+		self.quill = eval("""
+					new window.top.quill("#%s",{}) // quill works without toolbar as well
+					""" % (self["id"]))
+		q = self.quill
+		eval("parent.lastSelection = {}; parent.lastSelection.index = parent.lastSelection.length = 0;")
+		JS("parent.myQuill = @{{q}}")
+
+		self.quill.on("editor-change", self.updateActionBar)
+		self.quill.on("selection-change", self.updateSelection)
 
 	def changed(self):
 		return self.initial_txt != self.element.innerHTML
 
-	#def onKeyDown(self, e):
-	#	if e.keyCode == 13:
-	#		print("br")
-	#		return False
+	def updateActionBar(self, *args, **kwargs):
+		self.editorChangeEvent.fire()
 
-	def toggleSelection(self, tagName):
-		"""
-		This was a test...
-		"""
+	def updateSelection(self, *args, **kwargs):
+		if args[2] == "user":
+			JS("""
+				if(parent.document.getElementsByClassName('linkEditor')) {
+					if(parent.document.getElementsByClassName('linkEditor')[0]) {
+						if(parent.document.getElementsByClassName('linkEditor')[0].parentNode) {
+							if(parent.document.getElementsByClassName('linkEditor')[0].parentNode.parentNode) {
+								parent.document.getElementsByClassName('linkEditor')[0].parentNode.parentNode.removeChild(parent.document.getElementsByClassName('linkEditor')[0].parentNode)
+							}
+						}
+					}
+				}
+			""")
+			try:
+				fmt = self.quill.getFormat()
+			except:
+				return
 
-		sel = eval("window.top.document.getSelection()")
-		range = sel.getRangeAt(0)
-		current = range.extractContents()
+			
+			if getattr(fmt, "link", None):
+				value = getattr(fmt, "link", None)
+				lastSelection =(JS("parent.lastSelection"))
 
-		try:
-			print(current)
-			print(current.nodeType)
-			print(current.tagName)
-		except:
-			pass
+				jsonSel = json.dumps(self.quill.getFormat())
+				start = self.quill.getSelection().index - 1
+				length = 0
 
-		if current.nodeType == 11 and current.firstElementChild: #DocumentFragment
-			current = current.firstElementChild
+				while json.dumps(self.quill.getFormat(start)) == jsonSel:
+					start = start - 1
 
-		try:
-			print(current)
-			print(current.nodeType)
-			print(current.tagName)
-		except:
-			pass
+				while json.dumps(self.quill.getFormat(start + 1, length)) == jsonSel:
+					length = length + 1
 
-		if current and current.nodeType == 1 and str(current.tagName).upper() == tagName.upper():
-			print("Toggle OFF")
+				if lastSelection.index == start and lastSelection.length == length:
+					return
+				
+				self.quill.setSelection(start, length)
 
-			if current.hasChildNodes():
-				while current.firstChild:
-					range.insertNode(current.firstChild)
+				top = self.quill.getBounds(start, length).top + self.quill.getBounds(start, length).height + eval("parent.document.getElementById('%s').getBoundingClientRect().top" % self["id"])
+				left = self.quill.getBounds(start, length).left + eval("parent.document.getElementById('%s').getBoundingClientRect().left" % self["id"])
 
-		else:
-			print("Toggle ON")
+				LinkEditor(value=value, quill=self.quill, left=left, top=top)
 
-			new = eval("window.top.document.createElement(\"%s\")" % tagName)
-			new.appendChild(current)
-
-			range.insertNode(new)
-
-		print("%s done" % tagName)
+			eval("parent.lastSelection.index = '%s'; parent.lastSelection.length = '%s';" % (self.quill.getSelection().index, self.quill.getSelection().length))
 
 	def execCommand(self, commandName, valueArgument=None):
 		"""
@@ -962,232 +1038,179 @@ class Wysiwyg( html5.Div ):
 		self.cursorMovedEvent = EventDispatcher("cursorMoved")
 		self.saveTextEvent = EventDispatcher("saveText")
 		self.abortTextEvent = EventDispatcher("abortText")
-		self.textActions = ["style.text.bold",
-		                    "style.text.italic"]+\
-		                   ["style.text.h%s" % x for x in range(0,4)]+\
-		                   ["text.removeformat",
-							"style.text.justifyCenter",
-							"style.text.justifyLeft",
-							"style.text.justifyRight",
-			                "style.text.blockquote",
-			                "text.orderedList",
-			                "text.unorderedList",
-			                "text.indent",
-			                "text.outdent",
-			                "text.image",
-			                "text.link",
-			                "text.table",
-			                "text.flipView",
-			                "text.undo",
-			                "text.redo",
-			                "text.abort",
-			                "text.save"]
 
-		#self["type"] = "text"
-		self.actionbar = ActionBar(None, None, actionBarHint)
+		self.primaryActions = ActionBar(None, None, actionBarHint)
+		self.primaryActions.removeClass("actionbar")
+		self.primaryActions.setActions([
+			"style.text.bold",
+			"style.text.italic",
+			"style.text.super",
+			"style.text.sub",
+		    "style.text.h1",
+			"style.text.h2",
+			"style.text.h3",
+			"style.text.h4",
+			"|",
+			"text.removeformat",
+			"|",
+			"text.undo",
+			"text.redo",
+			"|",
+			"text.flipView",
+			"|",
+			"text.abort",
+			"text.save"])
+
+		self.secondaryActions = ActionBar(None, None, None)
+		self.secondaryActions.removeClass("actionbar")
+		self.secondaryActions.setActions([
+			"style.text.alignLeft",
+			"style.text.alignCenter",
+			"style.text.alignRight",
+			"style.text.alignJustify",
+			"|",
+			"text.outdent",
+			"text.indent",
+			"|",
+			"style.text.blockquote",
+			"text.orderedList",
+			"text.unorderedList",
+			"|",
+			"text.divider",
+			"text.image",
+			"text.link",
+		])
+
+		self.rawCodeActions = ActionBar(None, None, actionBarHint)
+		self.rawCodeActions.hide()
+		self.rawCodeActions.removeClass("actionbar")
+		self.rawCodeActions.setActions(["text.flipView"])
+
+		self.actionbarWrap = html5.Div()
+		self.actionbarWrap.addClass("actionbar")
+		self.actionbarWrap.appendChild(self.primaryActions)
+		self.actionbarWrap.appendChild(self.secondaryActions)
+		self.actionbarWrap.appendChild(self.rawCodeActions)
+		self.appendChild(self.actionbarWrap)
+		
+		self.source = html5.form.Textarea()
+		self.source.addClass("sourceCode")
+		self.source.hide()
+		self.appendChild(self.source)
+		
 		self.isWysiwygMode = True
 		self.discardNextClickEvent = False
-		self.appendChild( self.actionbar )
-		self.tableDiv = html5.Div()
-		self.tableDiv["class"].append("tableeditor")
-		self.appendChild(self.tableDiv)
-		for c in [TableInsertRowBeforeAction,TableInsertRowAfterAction,TableInsertColBeforeAction,TableInsertColAfterAction,TableRemoveRowAction,TableRemoveColAction]:
-			self.tableDiv.appendChild( c() )
-		self.tableDiv["style"]["display"]="none"
-		self.linkEditor = LinkEditor()
-		self.appendChild(self.linkEditor)
-		self.imgEditor = ImageEditor()
-		self.appendChild(self.imgEditor)
+		self.editor = Editor(self, editHtml)
 
-		self.editor = Editor(editHtml)
-
-		self.appendChild( self.editor )
-		self.actionbar.setActions( self.textActions )
-		#btn = html5.ext.Button("Apply", self.saveText)
-		#btn["class"].append("icon apply")
-		#self.appendChild( btn )
 		self.currentImage = None
 		self.cursorImage = None
 		self.lastMousePos = None
 		self.sinkEvent("onMouseDown", "onMouseUp", "onMouseMove", "onClick")
 
 	def flipView(self, *args, **kwargs ):
-		htmlStr = self.editor.element.innerHTML
+		htmlStr = self.editor.quill.root.innerHTML
+
 		if self.isWysiwygMode:
-			self.imgEditor.doClose()
-			self.linkEditor.doClose()
-			self.tableDiv["style"]["display"] = None
 			outStr = ""
 			indent = 0
-			indestStr = "&nbsp;&nbsp;&nbsp;"
-			inStr = htmlStr.replace("&", "&amp;" ).replace("<", "&lt;" ).replace(">","&gt;")
+			indestStr = "    "
+			inStr = htmlStr
 			while inStr:
-				if inStr.startswith("&lt;div&gt;"):
-					outStr += "<br>"
+				if inStr.startswith("<div"):
+					outStr += "\n"
 					outStr += indestStr*indent
 					indent +=1
-				elif inStr.startswith("&lt;/div&gt;"):
+				elif inStr.startswith("</div>"):
 					indent -=1
-					outStr += "<br>"
+					outStr += "\n"
 					outStr += indestStr*indent
-				elif inStr.startswith("&lt;br"):
-					outStr += "<br>"
-					outStr += indestStr*indent
-				elif inStr.startswith("&lt;table"):
-					outStr += "<br>"
+				if inStr.startswith("<p"):
+					outStr += "\n"
 					outStr += indestStr*indent
 					indent +=1
-				elif inStr.startswith("&lt;/table"):
+				elif inStr.startswith("</p>"):
 					indent -=1
-					outStr += "<br>"
 					outStr += indestStr*indent
-				elif inStr.startswith("&lt;tr"):
-					outStr += "<br>"
+				elif inStr.startswith("<br"):
+					outStr += "\n"
+					outStr += indestStr*indent
+				elif inStr.startswith("<table"):
+					outStr += "\n"
 					outStr += indestStr*indent
 					indent +=1
-				elif inStr.startswith("&lt;/tr"):
+				elif inStr.startswith("</table"):
 					indent -=1
-					outStr += "<br>"
+					outStr += "\n"
 					outStr += indestStr*indent
-				elif inStr.startswith("&lt;td"):
-					outStr += "<br>"
-					outStr += indestStr*indent
-				elif inStr.startswith("&lt;th&gt;"):
-					outStr += "<br>"
-					outStr += indestStr*indent
-				elif inStr.startswith("&lt;thead&gt;"):
-					outStr += "<br>"
+				elif inStr.startswith("<tr"):
+					outStr += "\n"
 					outStr += indestStr*indent
 					indent +=1
-				elif inStr.startswith("&lt;/thead&gt;"):
+				elif inStr.startswith("</tr"):
 					indent -=1
-					outStr += "<br>"
+					outStr += "\n"
 					outStr += indestStr*indent
-				elif inStr.startswith("&lt;tbody&gt;"):
-					outStr += "<br>"
+				elif inStr.startswith("<td"):
+					outStr += "\n"
+					outStr += indestStr*indent
+				elif inStr.startswith("<th>"):
+					outStr += "\n"
+					outStr += indestStr*indent
+				elif inStr.startswith("<thead"):
+					outStr += "\n"
 					outStr += indestStr*indent
 					indent +=1
-				elif inStr.startswith("&lt;/tbody&gt;"):
+				elif inStr.startswith("</thead>"):
 					indent -=1
-					outStr += "<br>"
+					outStr += "\n"
+					outStr += indestStr*indent
+				elif inStr.startswith("<tbody"):
+					outStr += "\n"
+					outStr += indestStr*indent
+					indent +=1
+				elif inStr.startswith("</tbody>"):
+					indent -=1
+					outStr += "\n"
 					outStr += indestStr*indent
 				outStr += inStr[0]
 				inStr = inStr[ 1: ]
-			self.editor.element.innerHTML = outStr
-			self.actionbar.setActions( ["text.flipView"] )
+	
+			self.editor.hide()
+			self.source.show()
+
+			self.primaryActions.hide()
+			self.secondaryActions.hide()
+			self.rawCodeActions.show()
+
+			self.source.element.value = outStr.strip()
+
+			#self.actionbar1.setActions(["text.flipView"])
+			#self.actionbar2.setActions([])
 		else:
-			htmlStr = re.sub(r'<[^>]*?>', '', htmlStr)
-			htmlStr = htmlStr.replace("&nbsp;","").replace("&nbsp;","")
-			self.editor.element.innerHTML = htmlStr.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
-			self.actionbar.setActions( self.textActions )
+			htmlStr = self.source.element.value
+			#htmlStr = re.sub("\n", '', htmlStr)
+			#htmlStr = re.sub("&nbsp;", '', htmlStr).strip()
+
+			self.editor.quill.root.innerHTML = htmlStr
+			#self.editor.quill.setText(self.source.element.value)
+
+			self.editor.show()
+			self.source.hide()
+
+			self.primaryActions.show()
+			self.secondaryActions.show()
+			self.rawCodeActions.hide()
+
+		#self.actionbar1.setActions(self.textActions1)
+			#self.actionbar2.setActions(self.textActions2)
 
 		self.isWysiwygMode = not self.isWysiwygMode
 		return self.isWysiwygMode
 
 
 	def saveText(self, *args, **kwargs):
-		self.saveTextEvent.fire(self, self.editor.element.innerHTML)
+		htmlStr = self.editor.quill.root.innerHTML
+		self.saveTextEvent.fire(self, htmlStr)
 
 	def abortText(self, *args, **kwargs):
 		self.abortTextEvent.fire(self)
-
-	def onMouseDown(self, event):
-		self.lastMousePos = None
-		if event.target.tagName=="IMG":
-			offsetLeft = event.pageX-event.target.offsetLeft
-			offsetTop = event.pageY-event.target.offsetTop
-			if event.target.offsetParent is not None:
-				offsetLeft -= event.target.offsetParent.offsetLeft
-				offsetTop -= event.target.offsetParent.offsetTop
-			if offsetLeft>0.8*event.target.clientWidth and offsetTop>0.8*event.target.clientHeight:
-				self.currentImage = event.target
-			self.imgEditor.doOpen( event.target )
-			self.discardNextClickEvent = True
-			event.preventDefault()
-			event.stopPropagation()
-		else:
-			self.currentImage = None
-			super( Wysiwyg, self ).onMouseDown(event)
-
-		node = eval("window.top.getSelection().anchorNode")
-
-		while node and node != self.editor.element:
-			#FIXME.. emit cursormoved event
-			node = node.parentNode
-
-	def onMouseUp(self, event):
-		self.currentImage = None
-		self.lastMousePos = None
-		super( Wysiwyg, self ).onMouseUp(event)
-
-	def onMouseMove(self, event):
-		if event.target.tagName=="IMG":
-			offsetLeft = event.pageX-event.target.offsetLeft
-			offsetTop = event.pageY-event.target.offsetTop
-			if event.target.offsetParent is not None:
-				offsetLeft -= event.target.offsetParent.offsetLeft
-				offsetTop -= event.target.offsetParent.offsetTop
-			if offsetLeft>0.8*event.target.clientWidth and offsetTop>0.8*event.target.clientHeight:
-				self.cursorImage = event.target
-				self.cursorImage.style.cursor = "se-resize"
-			else:
-				if self.cursorImage is not None:
-					self.cursorImage.style.cursor = "default"
-					self.cursorImage = None
-		elif self.cursorImage is not None:
-			self.cursorImage.style.cursor = "default"
-			self.cursorImage = None
-		if self.currentImage is not None and event.target.tagName=="IMG" and self.currentImage==event.target:
-			if self.lastMousePos is None:
-				self.lastMousePos = (event.x, event.y)
-				return
-			x,y = self.lastMousePos
-			self.lastMousePos = (event.x, event.y)
-			event.target.width = event.target.clientWidth-(x-event.x)
-			event.target.height = event.target.clientHeight-(y-event.y)
-			event.preventDefault()
-			event.stopPropagation()
-		else:
-			self.lastMousePos = None
-			self.currentImage = None
-			super( Wysiwyg, self ).onMouseMove(event)
-
-
-	def onClick(self, event):
-		if self.discardNextClickEvent:
-			self.discardNextClickEvent = False
-			return
-
-		super(Wysiwyg, self).onClick( event )
-		domWdg = event.target
-		isEditorTarget = False
-
-		while domWdg:
-			if domWdg==self.editor.element:
-				isEditorTarget = True
-				break
-			domWdg = domWdg.parentNode
-
-		if not isEditorTarget:
-			return
-
-		node = eval("window.top.getSelection().anchorNode")
-		nodeStack = []
-		i = 10
-
-		#Try to extract the relevant nodes from the dom
-		while i>0 and node and node != self.editor.element:
-			i -= 1
-			nodeStack.append(node)
-			node = node.parentNode
-
-		if "TABLE" in [(x.tagName if "tagName" in dir(x) else "") for x in nodeStack]:
-			self.tableDiv["style"]["display"] = ""
-		else:
-			self.tableDiv["style"]["display"] = "none"
-
-		self.linkEditor.onCursorMoved(nodeStack)
-		self.imgEditor.onCursorMoved(nodeStack)
-		self.cursorMovedEvent.fire( nodeStack )
-
-

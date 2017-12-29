@@ -1,0 +1,11 @@
+{
+  "name": "vi-textedit",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "babel textedit.es6 -o ../public/textedit.js"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.24.1",
+    "babel-preset-env": "^1.6.0"
+  }
+}
