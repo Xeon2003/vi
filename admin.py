@@ -5,7 +5,7 @@ from config import conf
 from widgets import TopBarWidget
 from widgets.userlogoutmsg import UserLogoutMsg
 from network import NetworkService, DeferredCall
-from event import viInitializedEvent, EventDispatcher
+from event import viInitializedEvent
 from priorityqueue import HandlerClassSelector, initialHashHandler, startupQueue
 from log import Log
 from pane import Pane, GroupPane
@@ -35,17 +35,17 @@ class AdminScreen(Screen):
 		self.workSpace["class"] = "vi_workspace"
 		self.appendChild(self.workSpace)
 
-		self.modulMgr = html5.Div()
-		self.modulMgr["class"] = "vi_wm"
-		self.appendChild(self.modulMgr)
+		self.moduleMgr = html5.Div()
+		self.moduleMgr["class"] = "vi_wm"
+		self.appendChild(self.moduleMgr)
 
-		self.modulList = html5.Nav()
-		self.modulList["class"] = "vi_manager"
-		self.modulMgr.appendChild(self.modulList)
+		self.moduleList = html5.Nav()
+		self.moduleList["class"] = "vi_manager"
+		self.moduleMgr.appendChild(self.moduleList)
 
 		self.moduleListUl = html5.Ul()
 		self.moduleListUl["class"] = "modullist"
-		self.modulList.appendChild(self.moduleListUl)
+		self.moduleList.appendChild(self.moduleListUl)
 
 		self.viewport = html5.Div()
 		self.viewport["class"] = "vi_viewer"
@@ -57,7 +57,8 @@ class AdminScreen(Screen):
 		self.currentPane = None
 		self.nextPane = None #Which pane gains focus once the deferred call fires
 		self.panes = [] # List of known panes. The ordering represents the order in which the user visited them.
-		self.userLoggedOutMsg = UserLogoutMsg()
+
+		self.userLoggedOutMsg = None
 
 		# Register the error-handling for this iframe
 		le = eval("window.top.logError")
@@ -66,9 +67,24 @@ class AdminScreen(Screen):
 		w = eval("window.top")
 		w.onerror = le
 
+	def reset(self):
+		self.moduleListUl.removeAllChildren()
+		self.viewport.removeAllChildren()
+		self.logWdg.reset()
+
+		self.currentPane = None
+		self.nextPane = None
+		self.panes = []
+
+		if self.userLoggedOutMsg:
+			self.userLoggedOutMsg.stopInterval()
+			self.userLoggedOutMsg = None
+
 	def invoke(self):
 		self.show()
 		self.lock()
+
+		self.reset()
 
 		# Run queue
 		startupQueue.setFinalElem(self.startup)
@@ -94,6 +110,9 @@ class AdminScreen(Screen):
 		if not conf["currentUser"]:
 			self.getCurrentUser()
 			return
+
+		self.userLoggedOutMsg = UserLogoutMsg()
+		self.topBar.invoke()
 
 		conf["server"] = config.get("configuration", {})
 
@@ -262,10 +281,10 @@ class AdminScreen(Screen):
 
 	def switchFullscreen(self, fullscreen = True):
 		if fullscreen:
-			self.modulMgr.hide()
+			self.moduleMgr.hide()
 			self.viewport.addClass("is_fullscreen")
 		else:
-			self.modulMgr.show()
+			self.moduleMgr.show()
 			self.viewport.removeClass("is_fullscreen")
 
 	def isFullscreen(self):

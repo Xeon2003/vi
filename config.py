@@ -5,10 +5,16 @@ from logics import Interpreter
 
 conf = {
 	# Vi version number
-	"vi.version": (2, 1, 0),
+	"vi.version": (2, 2, 0),
 
 	# Appendix to version
-	"vi.version.appendix": "devel",
+	"vi.version.appendix": "",
+
+	# Vi server name
+	"vi.viur": "ViUR",
+
+	# Vi name
+	"vi.name": "Vi",
 
 	# Which access rights are required to open the Vi?
 	"vi.access.rights": ["admin", "root"],

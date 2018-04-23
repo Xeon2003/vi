@@ -1,93 +1,71 @@
-This software is a part of the ViUR® Information System.
-ViUR® is a free software development framework for the Google App Engine™.
-More about ViUR can be found at http://www.viur.is/.
+# ViUR Vi [![Build Status](https://travis-ci.org/viur-framework/vi.svg?branch=develop)](https://travis-ci.org/viur-framework/vi)
 
-DESCRIPTION
-===========
-The **vi** is a web-based administration tool for ViUR-based applications.
+**Vi** is a web-based administration client for [ViUR-applications](https://github.com/viur-framework/).
 
-This software is a platform-independent HTML5-web-app that is written in
-Python and must be compiled to JavaScript using the PyJS (http://pyjs.org)
-toolchain.
+## About
 
-It was tested and runs very well with the latest versions of
+*Vi* (pronounced as "whee!", and standing as an acronym for *visual interface*), is a platform-independent HTML5-web-app providing a powerful on-line administration interface for applications implemented using the  [ViUR framework](https://github.com/viur-framework/).
 
-- Google Chrome
-- Apple Safari
-- Mozilla Firefox
-- Microsoft Internet Explorer >= 9
+*Vi* is written in Python and must be compiled into JavaScript using the [PyJS](https://github.com/pyjs/pyjs) transpiler. It was tested and runs well with the latest versions of Chrome (Chromium), Firefox and Safari. Microsoft Edge and Internet Explorer >= 9 should also run it suitable as well.
 
-Pre-compiled and packaged versions can be obtained on the official ViUR
-website at http://www.viur.is/.
+Pre-compiled and pre-packaged versions of the Vi can be obtained on the official [ViUR website](https://www.viur.is/download).
 
-INSTALLATION
-============
-The compiled web-app has to be put in a directory "vi" within the ViUR
-application directory. The name of the directory can diverge when expressed
-into the application's `app.yaml` file also.
+## Installation
 
-Please refer to the ViUR documentation (http://docs.viur.is) to get more
-information.
+The compiled web-app has to be put in a directory ``vi/`` within the ViUR application directory. The name of the directory can diverge when expressed so within the applications' ``app.yaml`` file.
 
-DEPENDENCIES
-============
-This software is implemented on top of the PyJS framework and uses the
-**html5** library which is also part of the ViUR open source project.
+Please check out the [ViUR documentation](https://docs.viur.is/latest) to get more information.
 
-- The **html5** library can be found at https://bitbucket.org/viur/html5
-- **pyjs** can be obtained from https://github.com/pyjs/pyjs
-- **lessc** is required to build securely (http://lesscss.org)
+## Requirements
 
-Therefore, a PyJS build-environment has to be configured meeting the above
-dependencies.
+This software is implemented on top of the [PyJS framework](https://github.com/pyjs/pyjs) and uses the [html5 library](https://github.com/viur-framework/html5) to create DOM objects and the [logics expression language](https://github.com/viur-framework/logics) to serve for customized run-time condition evaluations. The *html5 library* and *logics* are also part of the ViUR open source project.
 
-BUILDING
-========
-This repository contains a simple Makefile for GNU make to get all compilation
-tasks and dependencies done.
+To build Vi on your own, [PyJS](https://github.com/pyjs/pyjs) and [{less}](http://lesscss.org/) is required.
 
-By default, it builds into a directory called ``vi`` within the source root
-directory. In an advanced setup (project based setup), it builds into the
-folder ``../appengine/vi``, up one level of the working directory, which makes
-it suitable to use this repository as a submodule of an entire application's
-source repository.
+## Building
 
-After checking out vi, simply move into the working directory and type:
+Because Vi provides the ability to get easily customized and extended, this repository contains a simple Makefile for GNU make to get all compilation tasks and dependencies done.
 
-	make
+By default, it builds into a directory called ``vi`` within the source root directory. In an advanced setup (project based setup), it builds into the folder ``../appengine/vi`` or ``../deploy/vi``, up one level of the working directory, which makes it suitable to use this repository as a submodule of an entire applications source repository. This configuration is used in the [ViUR base project](https://github.com/viur-framework/base).
+
+After checking out Vi, simply move into the working directory and type:
+
+```bash
+$ make
+```
 
 to create a deploy-able and speed-optimized version, run
 
-	make deploy
+```bash
+$ make deploy
+```
 
 to remove all generated files and rebuild from scratch, type
 
-	make clean
+```bash
+$ make clean
+$ make
+```
 
-WHO CREATES VIUR?
-=================
+## Contributing
 
-ViUR is developed and maintained by Mausbrand Informationssysteme GmbH,
-from Dortmund, Germany.
+We take a great interest in your opinion about ViUR. We appreciate your feedback and are looking forward to hear about your ideas. Share your visions or questions with us and participate in ongoing discussions.
 
-We are a software company consisting of young, enthusiastic software
-developers, designers and social media experts, working on exciting
-projects for different kinds of customers. All of our newer projects are
-implemented with ViUR, from tiny web-pages to huge company intranets with
-hundreds of users.
+- [ViUR website](https://www.viur.is)
+- [#ViUR on freenode IRC](https://webchat.freenode.net/?channels=viur)
+- [ViUR on GitHub](https://github.com/viur-framework)
+- [ViUR on Twitter](https://twitter.com/weloveViUR)
 
-Help of any kind to extend and improve or enhance this project in any kind or
-way is always appreciated.
+## Credits
 
-LICENSING
-=========
+ViUR is developed and maintained by [Mausbrand Informationssysteme GmbH](https://www.mausbrand.de/en), from Dortmund in Germany. We are a software company consisting of young, enthusiastic software developers, designers and social media experts, working on exciting projects for different kinds of customers. All of our newer projects are implemented with ViUR, from tiny web-pages to huge company intranets with hundreds of users.
 
-Copyright (C) 2012-2017 by Mausbrand Informationssysteme GmbH.
+Help of any kind to extend and improve or enhance this project in any kind or way is always appreciated.
 
-Mausbrand and ViUR are registered trademarks of
-Mausbrand Informationssysteme GmbH.
+## License
 
-You may use, modify and distribute this software under the terms and
-conditions of the GNU Lesser General Public License (LGPL).
+Copyright (C) 2012-2018 by Mausbrand Informationssysteme GmbH.
 
-See the file LICENSE provided in this package for more information.
+Mausbrand and ViUR are registered trademarks of Mausbrand Informationssysteme GmbH.
+
+You may use, modify and distribute this software under the terms and conditions of the GNU Lesser General Public License (LGPL). See the file LICENSE provided within this package for more information.
