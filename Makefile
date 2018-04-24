@@ -5,7 +5,6 @@
 # Programs
 PYJSBUILD	=	pyjsbuild
 LESSC		=	lessc
-NPM         =   npm
 
 # Variables
 VI_CUSTOM	= 	../vi_customizing
@@ -26,9 +25,6 @@ MORE_LESS	=	public/login.less
 CUSTOM_LESS	=	public/default/vi_custom.less \
 				$(wildcard $(VI_CUSTOM)/static/vi_custom.less)
 
-TEXTEDIT_JS =   public/textedit.js
-TEXTEDIT_ES =   textedit/textedit.es6
-
 # Rules
 
 all: debug
@@ -41,9 +37,6 @@ defaultcss: $(MAIN_CSS)
 
 $(MAIN_CSS): $(MAIN_LESS) $(MORE_LESS) $(CUSTOM_LESS)
 	$(LESSC) $(LESSCOPTS) $(MAIN_LESS) >$@
-
-$(TEXTEDIT_JS): $(TEXTEDIT_ES)
-	cd textedit; $(NPM) run build
 
 copyfiles:
 	if [ -x $(VI_CUSTOM)/static ]; then \
