@@ -141,7 +141,7 @@ class TextEditor(html5.Div):
 						}
 					}
 		        },
-	            //theme: "snow"
+	            theme: "viur"
             })
         """)
 

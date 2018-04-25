@@ -64,3 +64,33 @@ LinkBlot.blotName = "link";
 LinkBlot.tagName = "A";
 
 Quill.register(LinkBlot, true);
+
+//Viur Theme
+
+let BaseTheme = Quill.import("themes/snow");
+let icons = Quill.import("ui/icons");
+
+const TOOLBAR_CONFIG = [
+  [{ header: ['1', '2', '3', false] }],
+  ['bold', 'italic', 'underline', 'link'],
+  [{ list: 'ordered' }, { list: 'bullet' }],
+  ['clean']
+];
+
+class ViurTheme extends BaseTheme {
+  constructor(quill, options) {
+    if (options.modules.toolbar != null && options.modules.toolbar.container == null) {
+      options.modules.toolbar.container = TOOLBAR_CONFIG;
+    }
+    super(quill, options);
+    this.quill.container.classList.add('ql-viur');
+  }
+
+  extendToolbar(toolbar) {
+    toolbar.container.classList.add('ql-viur');
+    this.buildButtons([].slice.call(toolbar.container.querySelectorAll('button')), icons);
+    this.buildPickers([].slice.call(toolbar.container.querySelectorAll('select')), icons);
+  }
+}
+
+Quill.register("themes/viur", ViurTheme);
