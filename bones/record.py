@@ -12,9 +12,9 @@ from pane import Pane
 from bones.base import BaseBoneExtractor
 
 
-class GroupBoneExtractor(BaseBoneExtractor):
+class RecordBoneExtractor(BaseBoneExtractor):
 	def __init__(self, module, boneName, skelStructure):
-		super(GroupBoneExtractor, self).__init__(module, boneName, skelStructure)
+		super(RecordBoneExtractor, self).__init__(module, boneName, skelStructure)
 		self.format = "$(dest.name)"
 
 		if "format" in skelStructure[boneName].keys():
@@ -37,7 +37,7 @@ class GroupBoneExtractor(BaseBoneExtractor):
 								for x in val])
 		except:
 			# We probably received some garbage
-			print("%s: GroupBoneExtractor.render cannot build relational format, maybe garbage received?" % self.boneName)
+			print("%s: RecordBoneExtractor.render cannot build relational format, maybe garbage received?" % self.boneName)
 			print(val)
 			val = ""
 
@@ -60,17 +60,17 @@ class GroupBoneExtractor(BaseBoneExtractor):
 								for x in val])
 		except:
 			# We probably received some garbage
-			print("%s: GroupBoneExtractor.raw cannot build relational format, maybe garbage received?" % self.boneName)
+			print("%s: RecordBoneExtractor.raw cannot build relational format, maybe garbage received?" % self.boneName)
 			print(val)
 			return None
 
 		return val[0] if len(val) == 1 else val
 
 
-class GroupViewBoneDelegate(object):
+class RecordViewBoneDelegate(object):
 
 	def __init__(self, module, boneName, structure):
-		super(GroupViewBoneDelegate, self).__init__()
+		super(RecordViewBoneDelegate, self).__init__()
 		self.module = module
 		self.structure = structure
 		self.boneName = boneName
@@ -105,7 +105,7 @@ class GroupViewBoneDelegate(object):
 		except:
 			# We probably received some garbage
 			print(
-				"%s: GroupViewBoneDelegate.render cannot build relational format, maybe garbage received?" % self.boneName)
+				"%s: RecordViewBoneDelegate.render cannot build relational format, maybe garbage received?" % self.boneName)
 			print(val)
 
 			res = ""
@@ -114,13 +114,13 @@ class GroupViewBoneDelegate(object):
 		return lbl
 
 
-class GroupSingleBone(html5.Div):
+class RecordSingleBone(html5.Div):
 	"""
-		Provides the widget for a groupBone with multiple=False
+		Provides the widget for a recordBone with multiple=False
 	"""
 
 	def __init__(self, moduleName, boneName, using, readOnly, required, *args, **kwargs):
-		super(GroupSingleBone, self).__init__(*args, **kwargs)
+		super(RecordSingleBone, self).__init__(*args, **kwargs)
 
 		self.moduleName = moduleName
 		self.boneName = boneName
@@ -136,7 +136,7 @@ class GroupSingleBone(html5.Div):
 			self["disabled"] = True
 
 	def _setDisabled(self, disable):
-		super(GroupSingleBone, self)._setDisabled(disable)
+		super(RecordSingleBone, self)._setDisabled(disable)
 		if not disable and not self._disabledState:
 			self.parent().removeClass("is_active")
 
@@ -176,17 +176,17 @@ class GroupSingleBone(html5.Div):
 	@staticmethod
 	def checkFor(moduleName, boneName, skelStructure, *args, **kwargs):
 		isMultiple = "multiple" in skelStructure[boneName].keys() and skelStructure[boneName]["multiple"]
-		return not isMultiple and (skelStructure[boneName]["type"] == "group"
-		                            or skelStructure[boneName]["type"].startswith("group."))
+		return not isMultiple and (skelStructure[boneName]["type"] == "record"
+		                            or skelStructure[boneName]["type"].startswith("record."))
 
-class GroupMultiBoneEntry(html5.Div):
+class RecordMultiBoneEntry(html5.Div):
 	"""
-		Wrapper-class that holds one referenced entry in a GroupMultiBone.
+		Wrapper-class that holds one referenced entry in a RecordMultiBone.
 		Provides the UI to display its data and a button to remove it from the bone.
 	"""
 
 	def __init__(self, parent, module, data, using, errorInfo = None, *args, **kwargs):
-		super(GroupMultiBoneEntry, self).__init__(*args, **kwargs)
+		super(RecordMultiBoneEntry, self).__init__(*args, **kwargs)
 		self.sinkEvent("onDrop", "onDragOver", "onDragLeave", "onDragStart", "onDragEnd", "onChange")
 
 		self.parent = parent
@@ -280,13 +280,13 @@ class GroupMultiBoneEntry(html5.Div):
 		return self.mask.serializeForDocument()
 
 
-class GroupMultiBone(html5.Div):
+class RecordMultiBone(html5.Div):
 	"""
-		Provides the widget for a groupBone with multiple=True
+		Provides the widget for a recordBone with multiple=True
 	"""
 
 	def __init__(self, moduleName, boneName, readOnly, using, *args, **kwargs):
-		super(GroupMultiBone, self).__init__(*args, **kwargs)
+		super(RecordMultiBone, self).__init__(*args, **kwargs)
 
 		self.moduleName = moduleName
 		self.boneName = boneName
@@ -316,14 +316,14 @@ class GroupMultiBone(html5.Div):
 		"""
 			Reset the is_active flag (if any)
 		"""
-		super(GroupMultiBone, self)._setDisabled(disable)
+		super(RecordMultiBone, self)._setDisabled(disable)
 		if not disable and not self._disabledState:
 			self.parent().removeClass("is_active")
 
 	@classmethod
 	def fromSkelStructure(cls, moduleName, boneName, skelStructure, *args, **kwargs):
 		"""
-			Constructs a new GroupMultiBone from the parameters given in skelStructure.
+			Constructs a new RecordMultiBone from the parameters given in skelStructure.
 			@param moduleName: Name of the module which send us the skelStructure
 			@type moduleName: string
 			@param boneName: Name of the bone which we shall handle
@@ -394,15 +394,15 @@ class GroupMultiBone(html5.Div):
 					if idx == errIdx:
 						errDict[errKey] = v
 
-			self.addEntry(GroupMultiBoneEntry(self, self.moduleName, data, self.using, errDict))
+			self.addEntry(RecordMultiBoneEntry(self, self.moduleName, data, self.using, errDict))
 
 	def onAddBtnClick(self, sender = None):
-		self.addEntry(GroupMultiBoneEntry(self, self.moduleName, {}, self.using))
+		self.addEntry(RecordMultiBoneEntry(self, self.moduleName, {}, self.using))
 
 	def addEntry(self, entry):
 		"""
-			Adds a new GroupMultiBoneEntry to this bone.
-			@type entry: GroupMultiBoneEntry
+			Adds a new RecordMultiBoneEntry to this bone.
+			@type entry: RecordMultiBoneEntry
 		"""
 		assert entry not in self.entries, "Entry %s is already in relationalBone" % str(entry)
 		self.entries.append(entry)
@@ -410,8 +410,8 @@ class GroupMultiBone(html5.Div):
 
 	def removeEntry(self, entry):
 		"""
-			Removes a GroupMultiBoneEntry from this bone.
-			@type entry: GroupMultiBoneEntry
+			Removes a RecordMultiBoneEntry from this bone.
+			@type entry: RecordMultiBoneEntry
 		"""
 		assert entry in self.entries, "Cannot remove unknown entry %s from relationalBone" % str(entry)
 		self.itemsDiv.removeChild(entry)
@@ -449,15 +449,15 @@ class GroupMultiBone(html5.Div):
 	@staticmethod
 	def checkFor(moduleName, boneName, skelStructure, *args, **kwargs):
 		isMultiple = "multiple" in skelStructure[boneName].keys() and skelStructure[boneName]["multiple"]
-		return isMultiple and (skelStructure[boneName]["type"] == "group"
-		                        or skelStructure[boneName]["type"].startswith("group."))
+		return isMultiple and (skelStructure[boneName]["type"] == "record"
+		                        or skelStructure[boneName]["type"].startswith("record."))
 
-def checkForGroupBone(moduleName, boneName, skelStructure, *args, **kwargs):
-	return skelStructure[boneName]["type"] == "group" or skelStructure[boneName]["type"].startswith("group.")
+def checkForRecordBone(moduleName, boneName, skelStructure, *args, **kwargs):
+	return skelStructure[boneName]["type"] == "record" or skelStructure[boneName]["type"].startswith("record.")
 
 
 # Register this Bone in the global queue
-editBoneSelector.insert(5, GroupMultiBone.checkFor, GroupMultiBone)
-editBoneSelector.insert(5, GroupSingleBone.checkFor, GroupSingleBone)
-viewDelegateSelector.insert(5, checkForGroupBone, GroupViewBoneDelegate)
-extractorDelegateSelector.insert(4, checkForGroupBone, GroupBoneExtractor)
+editBoneSelector.insert(5, RecordMultiBone.checkFor, RecordMultiBone)
+editBoneSelector.insert(5, RecordSingleBone.checkFor, RecordSingleBone)
+viewDelegateSelector.insert(5, checkForRecordBone, RecordViewBoneDelegate)
+extractorDelegateSelector.insert(4, checkForRecordBone, RecordBoneExtractor)
