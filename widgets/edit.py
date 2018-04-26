@@ -51,10 +51,6 @@ class InternalEdit(html5.Div):
 
 		for key, bone in self.skelStructure:
 
-			#Skip over invisible bones
-			if not bone["visible"]:
-				continue
-
 			#Enforcing readOnly mode
 			if readOnly:
 				tmpDict[key]["readonly"] = True
@@ -138,6 +134,10 @@ class InternalEdit(html5.Div):
 
 			currRow += 1
 			self.bones[key] = widget
+
+			#Hide invisible bones
+			if not bone["visible"]:
+				self.containers[key].hide()
 
 		if len(fieldSets)==1:
 			for (k,v) in fieldSets.items():
@@ -236,16 +236,14 @@ class InternalEdit(html5.Div):
 						if event == "logic.visibleIf":
 							self.containers[key].show()
 						elif event == "logic.readonlyIf":
-							if not self.containers[key]["disabled"]:
-								self.containers[key]["disabled"] = True
+							self.containers[key].disable()
 
 						# add more here...
 					else:
 						if event == "logic.visibleIf":
 							self.containers[key].hide()
 						elif event == "logic.readonlyIf":
-							if self.containers[key]["disabled"]:
-								self.containers[key]["disabled"] = False
+							self.containers[key].enable()
 						# add more here...
 
 
@@ -339,7 +337,7 @@ class EditWidget(html5.Div):
 			conf["mainWindow"].log("error", translate("The module '{module}' does not exist.", module=module))
 			assert module in conf["modules"].keys()
 
-		super( EditWidget, self ).__init__( *args, **kwargs )
+		super(EditWidget, self ).__init__(*args, **kwargs)
 		self.module = module
 
 		# A Bunch of santy-checks, as there is a great chance to mess around with this widget
@@ -366,6 +364,7 @@ class EditWidget(html5.Div):
 		self.applicationType = applicationType
 		self.key = key
 		self.mode = "edit" if self.key or applicationType == EditWidget.appSingleton else "add"
+		self.modified = False
 		self.node = node
 		self.skelType = skelType
 		self.clone = clone
@@ -380,15 +379,7 @@ class EditWidget(html5.Div):
 		self._lastData = {} #Dict of structure and values received
 
 		if hashArgs:
-			self._hashArgs = parseHashParameters( hashArgs )
-			'''
-			warningNode = html5.TextNode("Warning: Values shown below got overriden by the Link you clicked on and do NOT represent the actual values!\n"+\
-						"Doublecheck them before saving!")
-			warningSpan = html5.Span()
-			warningSpan["class"].append("warning")
-			warningSpan.appendChild( warningNode )
-			self.appendChild( warningSpan )
-			'''
+			self._hashArgs = parseHashParameters(hashArgs)
 		else:
 			self._hashArgs = None
 
@@ -399,15 +390,20 @@ class EditWidget(html5.Div):
 		self.actionbar = ActionBar(self.module, self.applicationType, self.mode)
 		self.appendChild(self.actionbar)
 
+		editActions = []
+
+		if self.mode == "edit":
+			editActions.append("refresh")
+
 		if module in conf["modules"] and conf["modules"][module]:
-			editActions = conf["modules"][module].get("editActions", [])
-		else:
-			editActions = []
+			editActions.extend(conf["modules"][module].get("editActions", []))
+
+		print("editActions", editActions)
 
 		if applicationType == EditWidget.appSingleton:
-			self.actionbar.setActions(["save.singleton", "reset"] + editActions)
+			self.actionbar.setActions(["save.singleton"] + editActions)
 		else:
-			self.actionbar.setActions(["save.close", "save.continue", "reset"] + editActions)#
+			self.actionbar.setActions(["save.close", "save.continue"] + editActions)
 
 		# Input form
 		self.form = html5.Form()
@@ -455,19 +451,22 @@ class EditWidget(html5.Div):
 						if event == "logic.visibleIf":
 							self.containers[key].show()
 						elif event == "logic.readonlyIf":
-							if not self.containers[key]["disabled"]:
-								self.containers[key]["disabled"] = True
+							self.containers[key].disable()
 
 						# add more here...
 					else:
 						if event == "logic.visibleIf":
 							self.containers[key].hide()
 						elif event == "logic.readonlyIf":
-							if self.containers[key]["disabled"]:
-								self.containers[key]["disabled"] = False
+							self.containers[key].enable()
 						# add more here...
 
 	def onChange(self, event):
+		self.modified = True
+		DeferredCall(self.performLogics)
+
+	def onBoneChange(self, bone):
+		self.modified = True
 		DeferredCall(self.performLogics)
 
 	def showErrorMsg(self, req=None, code=None):
@@ -619,9 +618,11 @@ class EditWidget(html5.Div):
 		assert (request or data)
 
 		if request:
-			data = NetworkService.decode( request )
+			data = NetworkService.decode(request)
 
 		if "action" in data and (data["action"] == "addSuccess" or data["action"] == "editSuccess"):
+			self.modified = False
+
 			logDiv = html5.Div()
 			logDiv["class"].append("msg")
 			spanMsg = html5.Span()
@@ -642,7 +643,7 @@ class EditWidget(html5.Div):
 			if "values" in data.keys() and "name" in data["values"].keys():
 				spanMsg = html5.Span()
 
-				name = data["values"].get("name", data["values"].get("key", ""))
+				name = data["values"].get("name") or data["values"].get("key", "")
 				if isinstance(name, dict):
 					if conf["currentlanguage"] in name.keys():
 						name = name[conf["currentlanguage"]]
@@ -685,6 +686,7 @@ class EditWidget(html5.Div):
 		self.containers = {}
 		self.actionbar.resetLoadingState()
 		self.dataCache = data
+		self.modified = False
 
 		tmpDict = {k: v for k, v in data["structure"]}
 		fieldSets = {}
@@ -697,15 +699,18 @@ class EditWidget(html5.Div):
 			if not self.context:
 				self.context = {}
 
+			if "=" in contextVariable:
+				contextVariable, contextKey = contextVariable.split("=", 1)
+			else:
+				contextKey = "key"
+
 			self.context.update({
-				contextVariable: data["values"].get("key")
+				contextVariable: data["values"].get(contextKey)
 			})
 
 		for key, bone in data["structure"]:
-			if not bone["visible"]:
-				continue
 
-			cat = defaultCat
+			cat = defaultCat #meow!
 
 			if ("params" in bone.keys()
 			    and isinstance(bone["params"], dict)
@@ -735,6 +740,9 @@ class EditWidget(html5.Div):
 
 			if "setContext" in dir(widget) and callable(widget.setContext):
 				widget.setContext(self.context)
+
+			if "changeEvent" in dir(widget):
+				widget.changeEvent.register(self)
 
 			#widget["class"].append(key)
 			#widget["class"].append(bone["type"].replace(".","_"))
@@ -777,8 +785,12 @@ class EditWidget(html5.Div):
 					containerDiv["class"].append(t)
 
 			currRow += 1
-			self.bones[ key ] = widget
-			self.containers[ key ] = containerDiv
+			self.bones[key] = widget
+			self.containers[key] = containerDiv
+
+			#Hide invisible bones
+			if not bone["visible"]:
+				self.containers[key].hide()
 
 		tmpList = [(k,v) for (k,v) in fieldSets.items()]
 		tmpList.sort(key=lambda x:x[0])
@@ -793,6 +805,9 @@ class EditWidget(html5.Div):
 			for view in views:
 				vmodule = view.get("module")
 				vvariable = view.get("context")
+				vclass = view.get("class")
+				vtitle = view.get("title")
+				vcolumns = view.get("columns")
 
 				if not vmodule:
 					print("Misconfiured view: %s" % view)
@@ -805,12 +820,15 @@ class EditWidget(html5.Div):
 				vdescr = conf["modules"][vmodule]
 
 				fs = html5.Fieldset()
-				fs.addClass("inactive")
+				fs.addClass("editview", "inactive")
+
+				if vclass:
+					fs.addClass(*vclass)
 
 				fs["name"] = vmodule
 				legend = html5.Legend()
 				fshref = fieldset_A()
-				fshref.appendChild(html5.TextNode(vdescr.get("name", vmodule)))
+				fshref.appendChild(html5.TextNode(vtitle or vdescr.get("name", vmodule)))
 				legend.appendChild(fshref)
 				fs.appendChild(legend)
 				section = html5.Section()
@@ -819,12 +837,14 @@ class EditWidget(html5.Div):
 				fieldSets[vmodule] = fs
 
 				if vvariable:
-					context = self.context.copy()
+					context = self.context.copy() if self.context else {}
 					context[vvariable] = data["values"]["key"]
 				else:
 					context = self.context
 
-				self.views[vmodule] = ListWidget(vmodule, filter=vdescr.get("filter", {}), context = context)
+				self.views[vmodule] = ListWidget(vmodule, filter=vdescr.get("filter", {}),
+				                                    columns = vcolumns or vdescr.get("columns"),
+				                                    context = context)
 				fs._section.appendChild(self.views[vmodule])
 				self.form.appendChild(fs)
 

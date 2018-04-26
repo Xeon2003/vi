@@ -11,21 +11,113 @@ from widgets.edit import EditWidget
 from pane import Pane
 from bones.base import BaseBoneExtractor
 
+class FileImagePopup(html5.ext.Popup):
+	def __init__(self, preview, *args, **kwargs):
+		super(FileImagePopup, self).__init__(title=preview.currentFile.get("name", translate("Unnamed Image")), className="image-viewer", *args, **kwargs)
+		self.sinkEvent("onClick")
+		self.preview = preview
+
+		img = html5.Img()
+		img["src"] = utils.getImagePreview(preview.currentFile, size=None)
+		self.appendChild(img)
+
+		div = html5.Div()
+		self.appendChild(div)
+
+		btn = html5.ext.Button(translate("Download"), self.onDownloadBtnClick)
+		btn.addClass("icon", "download")
+		div.appendChild(btn)
+
+		btn = html5.ext.Button(translate("Close"), self.onClick)
+		btn.addClass("btn_no")
+		div.appendChild(btn)
+
+
+	def onClick(self, event):
+		self.close()
+
+	def onDownloadBtnClick(self, sender = None):
+		self.preview.download()
+
 class FilePreviewImage(html5.Div):
-	def __init__(self, imageSrc = None, *args, **kwargs):
+	def __init__(self, file = None, size=150, *args, **kwargs):
 		super(FilePreviewImage, self).__init__(*args, **kwargs)
 		self.addClass("previewimg")
+		self.sinkEvent("onClick")
 
-		if imageSrc:
-			self.setImage(imageSrc)
+		self.size = size
 
-	def setImage(self, imageSrc):
-		if imageSrc:
-			self["style"]["background-image"] = "url('%s')" % imageSrc
-			self.show()
+		self.downloadA = html5.A()
+		self.downloadA.hide()
+		self.appendChild(self.downloadA)
+
+		self.isImage = False
+		self.downloadOnly = False
+		self.currentFile = None
+
+		self.setFile(file)
+
+	def setFile(self, file):
+		self.currentFile = file
+
+		preview = utils.getImagePreview(file, cropped=True, size = self.size) if file else None
+
+		if preview:
+			self.downloadOnly = self.isImage = True
+
+		else:
+			self.isImage = False
+			self.downloadOnly = True
+
+			if file:
+				preview = "icons/filetypes/file.svg"
+				mime = file.get("mimetype")
+				if mime:
+					for icon in ["bmp", "doc", "gif", "jpg", "pdf", "png", "tiff", "image", "audio", "video", "zip"]:
+						if icon in mime:
+							preview = "icons/filetypes/%s.svg" % icon
+							self.downloadOnly = False
+							break
+
+		if preview:
+			self["style"]["background-image"] = "url('%s')" % preview
 		else:
 			self["style"]["background-image"] = None
-			self.hide()
+
+		if self.currentFile:
+			self.addClass("is-clickable")
+		else:
+			self.removeClass("is-clickable")
+
+
+	def download(self):
+		if not self.currentFile:
+			return
+
+		self.downloadA["href"] = "/file/download/" + self.currentFile["dlkey"]
+		self.downloadA["download"] = self.currentFile.get("name", self.currentFile["dlkey"])
+		self.downloadA.element.click()
+
+	def onClick(self, event):
+		if not self.currentFile:
+			return
+
+		if self.isImage:
+			FileImagePopup(self)
+		else:
+			w = eval("window")
+
+			if self.downloadOnly:
+				self.download()
+				return
+
+			file = "/file/download/%s" % self.currentFile["dlkey"]
+
+			if self.currentFile.get("name"):
+				file += "?fileName=%s" % self.currentFile["name"]
+
+			w.open(file)
+
 
 class FileBoneExtractor(BaseBoneExtractor):
 	def __init__(self, module, boneName, structure):
@@ -42,37 +134,14 @@ class FileBoneExtractor(BaseBoneExtractor):
 
 	def render(self, data, field ):
 		assert field == self.boneName, "render() was called with field %s, expected %s" % (field,self.boneName)
-		if field in data.keys():
-			val = data[field]
-		else:
-			val = ""
+		val = data.get(field, "")
 
 		if isinstance(val, list):
-			result = list()
-			for f in val:
-				result.append(self.renderFileentry(f))
-			return ", ".join(result)
+			return [self.renderFileentry(f) for f in val]
 		elif isinstance(val, dict):
 			return self.renderFileentry(val)
+
 		return val
-
-
-class FileHref( html5.A ):
-	"""
-		This subclass drops all its links (href-, download- attributes) if its embedded directly inside a table.
-		This ensures that a click inside the table always results if focusing of that row (and not initializing
-		a download)
-	"""
-
-	def onAttach(self):
-		super( FileHref, self ).onAttach()
-		self.sinkEvent("onClick")
-
-	def onClick(self, event):
-		if isinstance( self.parent(), html5.Td ):
-			event.preventDefault()
-			event.stopPropagation()
-
 
 class FileViewBoneDelegate(object):
 
@@ -96,8 +165,7 @@ class FileViewBoneDelegate(object):
 		if not "name" in fileEntry.keys() and not "dlkey" in fileEntry.keys():
 			return None
 
-		adiv=FileHref()  #Fixme: We need a better method to accomplish this
-		adiv["Title"] = str(fileEntry["name"])
+		adiv = html5.Div()
 		if "mimetype" in fileEntry.keys():
 			try:
 				ftype, fformat = fileEntry["mimetype"].split("/")
@@ -106,41 +174,33 @@ class FileViewBoneDelegate(object):
 			except:
 				pass
 
-		if utils.getImagePreview(fileEntry):
-			adiv.appendChild(FilePreviewImage(utils.getImagePreview(fileEntry)))
+		adiv.appendChild(FilePreviewImage(fileEntry))
 
 		aspan=html5.Span()
 		aspan.appendChild(html5.TextNode(str(fileEntry.get("name", ""))))#fixme: formatstring!
-
 		adiv.appendChild(aspan)
+
 		adiv["class"].append("fileBoneViewCell")
-		adiv["draggable"]=True
-		metamime="application/octet-stream"
+		#adiv["draggable"]=True
+		#metamime="application/octet-stream"
 
-		if "mimetype" in fileEntry.keys():
-			metamime=str(fileEntry["mimetype"])
+		#if "mimetype" in fileEntry.keys():
+		#   metamime=str(fileEntry["mimetype"])
 
-		adiv["download"]="%s:%s:/file/download/%s?download=1&fileName=%s" % (metamime, str(fileEntry["name"]),
-		                                                            str(fileEntry["dlkey"]), str(fileEntry["name"]))
-		adiv["href"]="/file/download/%s?download=1&fileName=%s" % (str(fileEntry["dlkey"]), str(fileEntry["name"]))
+		#adiv["download"]="%s:%s:/file/download/%s?download=1&fileName=%s" % (metamime, str(fileEntry["name"]),
+		#                                                            str(fileEntry["dlkey"]), str(fileEntry["name"]))
+		#adiv["href"]="/file/download/%s?download=1&fileName=%s" % (str(fileEntry["dlkey"]), str(fileEntry["name"]))
 		return adiv
 
 	def render(self, data, field ):
 		assert field == self.boneName, "render() was called with field %s, expected %s" % (field,self.boneName)
-
-		if field in data.keys():
-			val = data[field]
-		else:
-			val = ""
+		val = data.get(field, "")
 
 		if isinstance(val, list):
 			#MultiFileBone
 			cell = html5.Div()
 
 			for f in val:
-				if cell.children():
-					cell.appendChild(html5.TextNode(", "))
-
 				cell.appendChild(self.renderFileentry(f))
 
 			return cell
@@ -158,7 +218,7 @@ class FileMultiSelectionBoneEntry(RelationalMultiSelectionBoneEntry):
 	def __init__(self, *args, **kwargs):
 		super(FileMultiSelectionBoneEntry, self).__init__(*args, **kwargs)
 		self["class"].append("fileentry")
-		self.prependChild(FilePreviewImage(utils.getImagePreview(self.data["dest"])))
+		self.prependChild(FilePreviewImage(self.data["dest"]))
 
 	def fetchEntry(self, key):
 		NetworkService.request(self.module,"view/leaf/"+key,
@@ -253,6 +313,9 @@ class FileSingleSelectionBone( RelationalSingleSelectionBone ):
 		self["class"].append("supports_upload")
 
 		self.previewImg = FilePreviewImage()
+		self.prependChild(self.previewImg)
+
+		self.selection = None
 
 	def onDragOver(self, event):
 		super(FileSingleSelectionBone,self).onDragOver(event)
@@ -331,9 +394,9 @@ class FileSingleSelectionBone( RelationalSingleSelectionBone ):
 			                        cacheable=True)
 			self.selectionTxt["value"] = translate("Loading...")
 
-			self.previewImg.setImage(utils.getImagePreview(self.selection["dest"]))
+			self.previewImg.setFile(self.selection["dest"])
 		else:
-			self.previewImg.setImage(None)
+			self.previewImg.setFile(None)
 			self.selectionTxt["value"] = ""
 
 		self.updateButtons()
