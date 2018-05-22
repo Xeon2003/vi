@@ -1,7 +1,11 @@
 #-*- coding: utf-8 -*-
 import html5, json
+from config import conf
 from i18n import translate
+
+from widgets.list import ListWidget
 from __pyjamas__ import JS
+
 
 class LinkEditor(html5.Div):
 	targets = ["", "_blank", "_self", "_parent", "_top"]
@@ -21,6 +25,10 @@ class LinkEditor(html5.Div):
 
 		self.url = html5.Input()
 		lbl.appendChild(self.url)
+
+		btnGen = html5.ext.Button(translate("Select"), callback=self.select)
+		btnGen.addClass("icon", "select")
+		lbl.appendChild(btnGen)
 
 		# Target
 		lbl = html5.Label(translate("Target"))
@@ -43,14 +51,35 @@ class LinkEditor(html5.Div):
 
 		# Buttons
 		btnSave = html5.ext.Button(translate("Save"), callback=self.save)
-		btnSave.addClass("button", "save")
+		btnSave.addClass("icon", "save")
 		self.appendChild(btnSave)
 
 		btnDelete = html5.ext.Button(translate("Delete"), callback=self.delete)
-		btnDelete.addClass("button", "delete")
+		btnDelete.addClass("icon", "delete")
 		self.appendChild(btnDelete)
 
 		self.hide()
+
+	def select(self, *args, **kwargs):
+		modules = []
+		for key, info in conf["modules"].items():
+			if "preview" in info and isinstance(info["preview"], str):
+				modules.append((key, info.get("name", key)))
+
+		html5.ext.SelectDialog(u"Please select a module", items=modules, callback = self.onModuleSelect)
+
+	def onModuleSelect(self, item):
+		try:
+			currentSelector = ListWidget(item[0], isSelector=True) #fixme: context?
+		except AssertionError:
+			return
+
+		currentSelector.selectionActivatedEvent.register(self)
+		conf["mainWindow"].stackWidget(currentSelector)
+		self.parent.parent().addClass("is_active")
+
+	def onSelectionActivated(self, table, selection):
+		self.url["value"] = selection[0]["name"]
 
 	def show(self, href = None, title = None, target = None, **attr):
 		if href is None:
