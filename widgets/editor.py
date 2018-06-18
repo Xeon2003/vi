@@ -16,11 +16,14 @@ class LinkEditor(html5.Div):
 		super(LinkEditor, self).__init__(*args, **kwargs)
 		self.addClass("vi-editor-link-edit")
 
+		self.sinkEvent("onChange")
+
 		self.parent = parent
 		self.mode = "edit"
 
 		# URL
-		lbl = html5.Label(translate("URL"))
+		lbl = html5.Label()
+		lbl.appendChild(html5.Span(translate("URL")))
 		self.appendChild(lbl)
 
 		self.url = html5.Input()
@@ -31,7 +34,8 @@ class LinkEditor(html5.Div):
 		lbl.appendChild(btnGen)
 
 		# Target
-		lbl = html5.Label(translate("Target"))
+		lbl = html5.Label()
+		lbl.appendChild(html5.Span(translate("Target")))
 		self.appendChild(lbl)
 
 		self.target = html5.Select()
@@ -43,30 +47,40 @@ class LinkEditor(html5.Div):
 			self.target.appendChild(opt)
 
 		# Title
-		lbl = html5.Label(translate("Title"))
+		lbl = html5.Label()
+		lbl.appendChild(html5.Span(translate("Title")))
 		self.appendChild(lbl)
 
 		self.title = html5.Input()
 		lbl.appendChild(self.title)
 
 		# Buttons
+		div = html5.Div()
+		div.addClass("vi-editor-link-edit-button-wrap")
+		self.appendChild(div)
+
 		btnSave = html5.ext.Button(translate("Save"), callback=self.save)
 		btnSave.addClass("icon", "save")
-		self.appendChild(btnSave)
+		div.appendChild(btnSave)
 
 		btnDelete = html5.ext.Button(translate("Delete"), callback=self.delete)
 		btnDelete.addClass("icon", "delete")
-		self.appendChild(btnDelete)
+		div.appendChild(btnDelete)
 
 		self.hide()
 
 	def select(self, *args, **kwargs):
 		modules = []
 		for key, info in conf["modules"].items():
-			if "preview" in info and isinstance(info["preview"], str):
+			#if "preview" in info and isinstance(info["preview"], str):
+			#	modules.append((key, info.get("name", key)))
+			if "link" in info and isinstance(info["link"], str):
 				modules.append((key, info.get("name", key)))
 
-		html5.ext.SelectDialog(u"Please select a module", items=modules, callback = self.onModuleSelect)
+		if len(modules) > 1:
+			html5.ext.SelectDialog(u"Please select a module", items=modules, callback=self.onModuleSelect)
+		elif len(modules) == 1:
+			self.onModuleSelect((modules[0][0], ))
 
 	def onModuleSelect(self, item):
 		try:
@@ -79,7 +93,36 @@ class LinkEditor(html5.Div):
 		self.parent.parent().addClass("is_active")
 
 	def onSelectionActivated(self, table, selection):
-		self.url["value"] = selection[0]["name"]
+		newUrl = conf["modules"][table.parent().module]["link"]
+		newUrl = newUrl.replace("{{module}}", table.parent().module)
+
+		for k, v in selection[0].items():
+			newUrl = newUrl.replace("{{%s}}" % k, v)
+
+		self.url["value"] = newUrl
+		self.checkUrl()
+		self.save(close=False)
+
+	def checkUrl(self):
+		window = eval("window")
+		encodeURI = eval("encodeURI")
+
+		host = "https://" + window.location.hostname
+		if window.location.port and window.location.port != 443:
+			host += ":%d/" % window.location.port
+		else:
+			host += "/"
+
+		if self.url["value"].startswith(host):
+			self.url["value"] = encodeURI(self.url["value"][len(host) - 1:])
+		elif self.url["value"].startswith("/") or self.url["value"].startswith("?") or self.url["value"].startswith("https://") or self.url["value"].startswith("http://"):
+			return
+		else:
+			self.url["value"] = encodeURI("/" + self.url["value"])
+
+	def onChange(self, e):
+		if html5.utils.doesEventHitWidgetOrChildren(e, self.url):
+			self.checkUrl()
 
 	def show(self, href = None, title = None, target = None, **attr):
 		if href is None:
@@ -97,10 +140,8 @@ class LinkEditor(html5.Div):
 
 		super(LinkEditor, self).show()
 
-	def save(self, *args, **kwargs):
+	def save(self, close = True, *args, **kwargs):
 		url = self.url["value"]
-		if url and not url.startswith("/file/") and not url.startswith("http"):
-			url = "http://" + url
 
 		if self.mode == "edit":
 			fmt = self.parent.getFormat("link")
@@ -123,7 +164,10 @@ class LinkEditor(html5.Div):
 		self.parent.format("link", href=url, title=self.title["value"],
 		                    target=self.targets[self.target["selectedIndex"]])
 
-		self.hide()
+		self.mode = "edit"
+
+		if close:
+			self.hide()
 
 	def delete(self, *args, **kwargs):
 		self.parent.format("link")
