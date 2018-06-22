@@ -122,6 +122,8 @@ class RecordSingleBone(html5.Div):
 	def __init__(self, moduleName, boneName, using, readOnly, required, *args, **kwargs):
 		super(RecordSingleBone, self).__init__(*args, **kwargs)
 
+		self.addClass("recordbone", "recordbone-single")
+
 		self.moduleName = moduleName
 		self.boneName = boneName
 		self.readOnly = readOnly
@@ -188,6 +190,8 @@ class RecordMultiBoneEntry(html5.Div):
 	def __init__(self, parent, module, data, using, errorInfo = None, *args, **kwargs):
 		super(RecordMultiBoneEntry, self).__init__(*args, **kwargs)
 		self.sinkEvent("onDrop", "onDragOver", "onDragLeave", "onDragStart", "onDragEnd", "onChange")
+
+		self.addClass("recordbone-entry")
 
 		self.parent = parent
 		self.module = module
@@ -288,6 +292,8 @@ class RecordMultiBone(html5.Div):
 	def __init__(self, moduleName, boneName, readOnly, using, *args, **kwargs):
 		super(RecordMultiBone, self).__init__(*args, **kwargs)
 
+		self.addClass("recordbone", "recordbone-multi")
+
 		self.moduleName = moduleName
 		self.boneName = boneName
 		self.readOnly = readOnly
@@ -301,6 +307,7 @@ class RecordMultiBone(html5.Div):
 		self.currentOver = None
 
 		self.itemsDiv = html5.Div()
+		self.itemsDiv.addClass("recordbone-entries")
 		self.appendChild(self.itemsDiv)
 
 		self.addBtn = html5.ext.Button("Add", self.onAddBtnClick)
