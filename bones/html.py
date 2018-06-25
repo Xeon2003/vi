@@ -1,140 +1,159 @@
 # -*- coding: utf-8 -*-
-import html5, utils
-from priorityqueue import editBoneSelector
-from __pyjamas__ import JS
+import html5
 
-class HtmlEditor(html5.Div):
+from priorityqueue import editBoneSelector, viewDelegateSelector, extractorDelegateSelector
+from config import conf
+from widgets.editor import HtmlEditor
+from i18n import translate
+from bones.base import BaseBoneExtractor
 
+
+class HtmlBoneExtractor(BaseBoneExtractor):
+
+	def render(self, data, field):
+		if field in data.keys():
+			##multilangs
+			if isinstance(data[field], dict):
+				resstr = ""
+				if "currentlanguage" in conf.keys():
+					if conf["currentlanguage"] in data[field].keys():
+						resstr = data[field][conf["currentlanguage"]].replace("&quot;", "").replace(";", " ").replace(
+							'"', "'")
+					else:
+						if data[field].keys().length > 0:
+							resstr = data[field][data[field].keys()[0]].replace("&quot;", "").replace(";", " ").replace(
+								'"', "'")
+				return '"%s"' % resstr
+			else:
+				# no langobject
+				return str('"%s"' % data[field].replace("&quot;", "").replace(";", " ").replace('"', "'"))
+		
+		return conf["empty_value"]
+
+
+class HtmlViewBoneDelegate(object):
 	def __init__(self, moduleName, boneName, skelStructure, *args, **kwargs):
-		super(HtmlEditor, self).__init__(*args, **kwargs)
-		self.sinkEvent("onChange")
-
-		self.moduleName = moduleName
-		self.boneName = boneName
+		super(HtmlViewBoneDelegate, self).__init__()
 		self.skelStructure = skelStructure
+		self.boneName = boneName
+		self.moduleName = moduleName
 
-		self.richView = html5.Div()
-		self.appendChild(self.richView)
+	def render(self, data, field):
+		if field in data.keys():
+			##multilangs
+			if isinstance(data[field], dict):
+				resstr = ""
+				if "currentlanguage" in conf.keys():
+					if conf["currentlanguage"] in data[field].keys():
+						resstr = data[field][conf["currentlanguage"]]
+					else:
+						if data[field].keys().length > 0:
+							resstr = data[field][data[field].keys()[0]]
+				aspan = html5.Span()
+				aspan.appendChild(html5.TextNode(resstr))
+				aspan["Title"] = str(data[field])
+				return (aspan)
+			else:
+				# no langobject
+				return (html5.Label(str(data[field])))
+			
+		return html5.Label(conf["empty_value"])
 
-		self.htmlView = html5.Textarea()
-		self.appendChild(self.htmlView)
 
-		self.value = ""
-		self.quill = None
+class HtmlEditBone(html5.Div):
+	def __init__(self, moduleName, boneName, readOnly, isPlainText, languages=None, descrHint=None, *args, **kwargs):
+		super(HtmlEditBone, self).__init__(*args, **kwargs)
+		self.boneName = boneName
+		self.readOnly = readOnly
+		self.selectedLang = False
+		self.isPlainText = isPlainText
+		self.languages = languages
+		self.descrHint = descrHint
+		self.currentEditor = None
+		self.valuesdict = dict()
 
-	def onAttach(self):
-		super(HtmlEditor, self).onAttach()
+		##multilangbone
+		if self.languages:
+			if "currentlanguage" in conf and conf["currentlanguage"] in self.languages:
+				self.selectedLang = conf["currentlanguage"]
+			elif len(self.languages) > 0:
+				self.selectedLang = self.languages[0]
 
-		if self.quill:
-			return
+			self.langButContainer = html5.Div()
+			self.langButContainer["class"].append("languagebuttons")
 
-		elem = self.richView.element
-		self.quill = JS("""
-			new window.top.quill(
-				// The element  
-				@{{elem}},
-				
-				// Options
-				{
-				        // Theme
-				        theme: 'snow',
-				
-				        // Modules
-				        modules:
-				            {
-				                // Toolbar
-				                toolbar: [
-				                    [{header: [false]}],
-				                    ["bold", "italic", "underline"], //, "image"
-				                    [{'list': 'bullet'}],
-				                    [{"align": []}],
-				                    ["clean"]
-				                ],
-				
-				                // Improved Line Break
-				                clipboard:
-				                    {
-				                        matchers: [
-				                            ['BR', window.top.lineBreakMatcher]
-				                        ]
-				                    }
-				                ,
-				                keyboard: {
-				                    bindings: {
-				                        linebreak: {
-				                            key: 13,
-				                            shiftKey:
-				                                true,
-				                            handler:
-				                            window.top.lineBreakHandler
-				                        }
-				                    }
-				                }
-				            }
-				    }		
-		)
-        """)
+			for lang in self.languages:
+				abut = html5.ext.Button(lang, self.changeLang)
+				abut["value"] = lang
+				self.langButContainer.appendChild(abut)
 
-		self.quill.on("editor-change", self.onEditorChange)
+			self.appendChild(self.langButContainer)
+			self.refreshLangButContainer()
 
-		if self.value:
-			self["value"] = self.value
+		self.editor = HtmlEditor()
+		self.appendChild(self.editor)
 
-	def onDetach(self):
-		super(HtmlEditor, self).onDetach()
-		self.value = self["value"]
+		if readOnly:
+			self.editor["readonly"] = True
 
-	def onEditorChange(self, *args, **kwargs):
-		self.updateHtmlView()
+	def changeLang(self, btn):
+		self.valuesdict[self.selectedLang] = self.editor["value"]
+		self.selectedLang = btn["value"]
 
-	def updateHtmlView(self):
-		self.htmlView["value"] = self["value"]
+		if self.selectedLang in self.valuesdict.keys():
+			self.editor["value"] = self.valuesdict[self.selectedLang]
+		else:
+			self.editor["value"] = ""
 
-	def updateRichView(self):
-		self["value"] = self.htmlView["value"]
+		self.refreshLangButContainer()
 
-	def onChange(self, event):
-		if html5.utils.doesEventHitWidgetOrChildren(event, self.htmlView):
-			self.updateRichView()
+	def refreshLangButContainer(self):
+		for abut in self.langButContainer._children:
+			if abut["value"] in self.valuesdict and self.valuesdict[abut["value"]]:
+				if not "is_filled" in abut["class"]:
+					abut["class"].append("is_filled")
+			else:
+				if not "is_unfilled" in abut["class"]:
+					abut["class"].append("is_unfilled")
 
-	def _getValue(self):
-		if not self.quill:
-			return self.value
-
-		txt = self.quill.root.innerHTML
-		txt = txt.replace('<p class="ql-align-justify"><br></p>', "") #https://github.com/quilljs/quill/issues/1328#issuecomment-310781582
-		return txt
-
-	def _setValue(self, val):
-		if not self.quill:
-			self.value = val
-			return
-
-		#self.quill.root.innerHTML = val
-		self.quill.clipboard.dangerouslyPasteHTML(val) #https://github.com/quilljs/quill/issues/252#issuecomment-314059954
-
-	@classmethod
-	def fromSkelStructure(cls, moduleName, boneName, skelStructure, *args, **kwargs):
-		return cls(moduleName, boneName, skelStructure)
+			if abut["value"] == self.selectedLang:
+				if not "is_active" in abut["class"]:
+					abut["class"].append("is_active")
+			else:
+				abut["class"].remove("is_active")
 
 	@staticmethod
-	def checkFor(moduleName, boneName, skelStructure, *args, **kwargs):
-		if boneName in skelStructure.keys():
-			if skelStructure[boneName].get("type") == "html":
-				return True
+	def fromSkelStructure(moduleName, boneName, skelStructure, *args, **kwargs):
+		readOnly = "readonly" in skelStructure[boneName].keys() and skelStructure[boneName]["readonly"]
+		#isPlainText = "validHtml" in skelStructure[boneName].keys() and not skelStructure[boneName]["validHtml"]
+		langs = skelStructure[boneName]["languages"] if (
+					"languages" in skelStructure[boneName].keys() and skelStructure[boneName]["languages"]) else None
+		descr = skelStructure[boneName]["descr"] if "descr" in skelStructure[boneName].keys() else None
+		return HtmlEditBone(moduleName, boneName, readOnly, langs, descrHint=descr)
 
-			if "params" in skelStructure[boneName] and skelStructure[boneName]["params"]:
-				return skelStructure[boneName]["params"].get("style") == "html"
+	def unserialize(self, data):
+		self.valuesdict.clear()
+		if self.boneName not in data.keys():
+			return
 
-		return False
+		if self.languages:
+			for lang in self.languages:
+				if self.boneName in data.keys() and isinstance(data[self.boneName], dict) and lang in data[
+					self.boneName].keys():
+					self.valuesdict[lang] = data[self.boneName][lang]
+				else:
+					self.valuesdict[lang] = ""
 
-	def unserialize(self, data, extendedErrorInformation = None):
-		self["value"] = data.get(self.boneName)
+			self.editor["value"] = self.valuesdict[self.selectedLang]
+		else:
+			self.editor["value"] = data[self.boneName] if data[self.boneName] else ""
 
 	def serializeForPost(self):
-		return {
-			self.boneName: self["value"]
-		}
+		if self.selectedLang:
+			self.valuesdict[self.selectedLang] = self.editor["value"]
+			return {self.boneName: self.valuesdict}
+		else:
+			return {self.boneName: self.editor["value"]}
 
 	def serializeForDocument(self):
 		return self.serializeForPost()
@@ -142,4 +161,11 @@ class HtmlEditor(html5.Div):
 	def setExtendedErrorInformation(self, errorInfo):
 		pass
 
-editBoneSelector.insert(20, HtmlEditor.checkFor, HtmlEditor)
+
+def CheckForHtmlBone(moduleName, boneName, skelStucture, *args, **kwargs):
+	return skelStucture[boneName]["type"] == "html" or skelStucture[boneName]["type"].startswith("html.")
+
+# Register this Bone in the global queue
+editBoneSelector.insert(3, CheckForHtmlBone, HtmlEditBone)
+viewDelegateSelector.insert(3, CheckForHtmlBone, HtmlViewBoneDelegate)
+extractorDelegateSelector.insert(3, CheckForHtmlBone, HtmlBoneExtractor)

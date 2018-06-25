@@ -5,7 +5,6 @@
 # Programs
 PYJSBUILD	=	pyjsbuild
 LESSC		=	lessc
-NPM         =   npm
 
 # Variables
 VI_CUSTOM	= 	../vi_customizing

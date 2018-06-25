@@ -213,6 +213,16 @@ class AdminScreen(Screen):
 		DeferredCall(self.checkInitialHash)
 		self.unlock()
 
+		#test test test
+		#pane = Pane("Texteditor")
+		#pane.addWidget(Wysiwyg("Hello World"))
+		#conf["mainWindow"].addPane(pane)
+
+	def remove(self):
+		self.userLoggedOutMsg.stopInterval()
+		self.userLoggedOutMsg = None
+		super(AdminScreen, self).remove()
+
 	def log(self, type, msg ):
 		self.logWdg.log( type, msg )
 
