@@ -17,6 +17,9 @@ import bones
 import actions
 import i18n
 
+# test test test
+#from widgets.wysiwyg import Wysiwyg
+
 class AdminScreen(Screen):
 
 	def __init__(self, *args, **kwargs ):
@@ -210,6 +213,16 @@ class AdminScreen(Screen):
 		DeferredCall(self.checkInitialHash)
 		self.unlock()
 
+		#test test test
+		#pane = Pane("Texteditor")
+		#pane.addWidget(Wysiwyg("Hello World"))
+		#conf["mainWindow"].addPane(pane)
+
+	def remove(self):
+		self.userLoggedOutMsg.stopInterval()
+		self.userLoggedOutMsg = None
+		super(AdminScreen, self).remove()
+
 	def log(self, type, msg ):
 		self.logWdg.log( type, msg )
 
@@ -217,7 +230,7 @@ class AdminScreen(Screen):
 		urlHash = conf["startupHash"]
 		if not urlHash:
 			return
-		
+
 		if "?" in urlHash:
 			hashStr = urlHash[1:urlHash.find("?")]
 			paramsStr = urlHash[urlHash.find("?")+1:]
@@ -235,7 +248,7 @@ class AdminScreen(Screen):
 		:param params: Parameters passed to the module
 		"""
 		path = [x for x in path.split("/") if x]
-		
+
 		param = {}
 
 		if params:

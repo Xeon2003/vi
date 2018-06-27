@@ -4,6 +4,7 @@ from bones import file
 from bones import hierarchy
 from bones import selectmulti
 from bones import selectone
+from bones import html
 from bones import text
 from bones import date
 from bones import string
@@ -15,3 +16,5 @@ from bones import numeric
 from bones import treedir
 from bones import spatial
 from bones import sortindex
+from bones import record
+from bones import html

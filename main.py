@@ -1,6 +1,5 @@
 #-*- coding: utf-8 -*-
 import html5, i18n, pyjd, network
-
 from login import LoginScreen
 from admin import AdminScreen
 from config import conf
