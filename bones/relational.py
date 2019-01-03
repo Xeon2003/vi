@@ -6,11 +6,13 @@ from event import EventDispatcher
 from i18n import translate
 from network import NetworkService
 from pane import Pane
+
+from bones.base import BaseBoneExtractor
+
 from priorityqueue import editBoneSelector, viewDelegateSelector, extendedSearchWidgetSelector, extractorDelegateSelector
 from widgets.edit import EditWidget
 from widgets.internaledit import InternalEdit
 from widgets.list import ListWidget
-
 
 def getDefaultValues(structure):
 	defaultValues = {}

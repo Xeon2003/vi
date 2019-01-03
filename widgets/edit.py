@@ -81,7 +81,7 @@ class EditWidget(html5.Div):
 	__editIdx_ = 0 #Internal counter to ensure unique ids
 
 	def __init__(self, module, applicationType, key=0, node=None, skelType=None, clone=False,
-	                hashArgs=None, context=None, logaction = "Entry saved!", *args, **kwargs):
+	                hashArgs=None, context=None, logAction = "Entry saved!", *args, **kwargs):
 		"""
 			Initialize a new Edit or Add-Widget for the given module.
 			@param module: Name of the module
@@ -106,6 +106,9 @@ class EditWidget(html5.Div):
 
 		super(EditWidget, self ).__init__(*args, **kwargs)
 		self.module = module
+
+		self.addClass("vi-widget vi-widget--edit form-group--validation")
+
 
 		# A Bunch of santy-checks, as there is a great chance to mess around with this widget
 		assert applicationType in [ EditWidget.appList, EditWidget.appHierarchy, EditWidget.appTree, EditWidget.appSingleton ] #Invalid Application-Type?
@@ -137,7 +140,7 @@ class EditWidget(html5.Div):
 		self.clone = clone
 		self.bones = {}
 		self.closeOnSuccess = False
-		self.logaction = logaction
+		self.logAction = logAction
 		self.sinkEvent("onChange")
 
 		self.context = context
@@ -368,14 +371,7 @@ class EditWidget(html5.Div):
 		                                secure=True, successHandler=self.cloneComplete )
 
 	def cloneComplete(self, request):
-		logDiv = html5.Div()
-		logDiv["class"].append("msg")
-		spanMsg = html5.Span()
-		spanMsg.appendChild( html5.TextNode( translate( u"The hierarchy will be cloned in the background." ) ) )
-		spanMsg["class"].append("msgspan")
-		logDiv.appendChild(spanMsg)
-
-		conf["mainWindow"].log("success",logDiv)
+		conf["mainWindow"].log("success", translate( u"The hierarchy will be cloned in the background." ))
 		self.closeOrContinue()
 
 	def setData(self, request=None, data=None, ignoreMissing=False, askHierarchyCloning=True):
@@ -396,11 +392,12 @@ class EditWidget(html5.Div):
 			self.modified = False
 
 			logDiv = html5.Div()
-			logDiv["class"].append("msg")
+			logDiv.addClass("msg")
+			# logDiv.addClass("msg-content") #redesign
 			spanMsg = html5.Span()
 
-			spanMsg.appendChild( html5.TextNode( translate( self.logaction ) ) )
-			spanMsg["class"].append("msgspan")
+			spanMsg.appendChild( html5.TextNode( translate( self.logAction ) ) )
+			spanMsg.addClass("msgspan")
 			logDiv.appendChild(spanMsg)
 
 			if self.module in conf["modules"].keys():
@@ -409,7 +406,7 @@ class EditWidget(html5.Div):
 					spanMsg.appendChild( html5.TextNode( self.key ) )
 				else:
 					spanMsg.appendChild( html5.TextNode( conf["modules"][self.module]["name"] ))
-				spanMsg["class"].append("modulespan")
+				spanMsg.addClass("modulespan")
 				logDiv.appendChild(spanMsg)
 
 			if "values" in data.keys() and "name" in data["values"].keys():
@@ -426,7 +423,7 @@ class EditWidget(html5.Div):
 					name = ", ".join(name)
 
 				spanMsg.appendChild(html5.TextNode(str(html5.utils.unescape(name))))
-				spanMsg["class"].append("namespan")
+				spanMsg.addClass("namespan")
 				logDiv.appendChild(spanMsg)
 
 			try:
@@ -507,23 +504,25 @@ class EditWidget(html5.Div):
 
 			descrLbl = html5.Label(key if conf["showBoneNames"] else bone.get("descr", key))
 			descrLbl.addClass(key, bone["type"].replace(".","_"))
+			# descrLbl.addClass("label", "vi-label", "vi-label--%s" % bone["type"].replace(".","-"), "vi-label--%s" % key) #redesign
 
-			'''
-			# Elements
+			# Elements (TEMP TEMP TEMP)
 			if ("params" in bone.keys()
 			    and isinstance(bone["params"], dict)
 			    and "elements.source" in bone["params"].keys()):
 				descrLbl.addClass("elements-%s" % bone["params"]["elements.source"])
-			'''
+			# /Elements (TEMP TEMP TEMP)
 
 			descrLbl["for"] = "vi_%s_%s_%s_%s_bn_%s" % (self.editIdx, self.module, self.mode, cat, key)
 
 			#print(key, bone["required"], bone["error"])
 			if bone["required"] or (bone.get("unique") and bone["error"]):
 				descrLbl.addClass("is_required")
+				# descrLbl.addClass("is-required") #redesign
 
 				if bone["error"] is not None:
 					descrLbl.addClass("is_invalid")
+					descrLbl.addClass("is-invalid") #redesign
 					segments[cat].addClass("is_incomplete")
 
 					descrLbl["title"] = bone["error"]
@@ -531,6 +530,7 @@ class EditWidget(html5.Div):
 
 				elif bone["error"] is None and not self.wasInitialRequest:
 					descrLbl.addClass("is_valid")
+					# descrLbl.addClass("is-valid") #redesign
 
 			if isinstance(bone["error"], dict):
 				widget.setExtendedErrorInformation(bone["error"])
@@ -543,13 +543,16 @@ class EditWidget(html5.Div):
 			    and isinstance(bone["params"], dict)
 			    and "tooltip" in bone["params"].keys()):
 				containerDiv.appendChild(ToolTip(longText=bone["params"]["tooltip"]))
+				# containerDiv.appendChild(ToolTip(shortText=key if conf["showBoneNames"] else bone.get("descr", key), longText=bone["params"]["tooltip"])) #redesign
 
 			segments[cat].addWidget(containerDiv)
 			containerDiv.addClass("bone", "bone_%s" % key, bone["type"].replace(".","_"))
+			# containerDiv.addClass("vi-bone", "vi-bone--%s" % bone["type"].replace(".","-"), "vi-bone--%s" % key) #redesign
 
 			if "." in bone["type"]:
 				for t in bone["type"].split("."):
-					containerDiv["class"].append(t)
+					containerDiv.addClass(t)
+					# containerDiv.addClass("vi-bone--%s" % t) #redesign
 
 			currRow += 1
 			self.bones[key] = widget
@@ -571,8 +574,7 @@ class EditWidget(html5.Div):
 
 		# Show default category
 		if firstCat:
-			firstCat.removeClass("inactive")
-			firstCat.addClass("active")
+			firstCat.activate()
 
 		# Views
 		views = conf["modules"][self.module].get("editViews")
@@ -612,7 +614,6 @@ class EditWidget(html5.Div):
 				                                    columns = vcolumns or vdescr.get("columns"),
 				                                    context = context)
 				segments[vmodule].addWidget(self.views[vmodule])
-				self.form.appendChild(fs)
 
 		#print(data["values"])
 		self.unserialize(data["values"])
@@ -652,9 +653,11 @@ class EditWidget(html5.Div):
 				if validityCheck:
 					# Fixme: Bad hack..
 					lbl = bone.parent()._children[0]
-					if "is_valid" in lbl["class"]:
-						lbl["class"].remove("is_valid")
-					lbl["class"].append("is_invalid")
+					if "is-valid" in lbl["class"]:
+						lbl.removeClass("is_valid")
+						# lbl.removeClass("is-valid") #redesign
+					lbl.addClass("is_invalid")
+					#lbl.addClass("is-invalid") #redesign
 					self.actionbar.resetLoadingState()
 					return None
 
